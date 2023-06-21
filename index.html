@@ -9,7 +9,7 @@
       padding: 0;
       overflow: hidden;
     }
-
+  
     #channelPicker {
       position: fixed;
       top: 0;
@@ -19,15 +19,22 @@
       background-color: #f1f1f1;
       padding: 10px;
     }
-
+  
     #videoContainer {
       position: fixed;
       top: 10%;
       left: 0;
       width: 100%;
-      height: 90%;
+      height: calc(90% - 10px); /* Adjusted to fit within 90% of the screen */
+      overflow: hidden;
     }
-
+  
+    .video-element {
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* Adjust the value as needed (contain, cover, etc.) */
+    }
+  
     .channel-button {
       display: inline-block;
       margin: 5px;
@@ -35,7 +42,7 @@
       border: none;
       cursor: pointer;
     }
-
+  
     #backButton {
       position: fixed;
       top: 0;
@@ -45,6 +52,7 @@
       background-color: #ccc;
     }
   </style>
+  
 </head>
 <body>
   <div id="channelPicker"></div>
@@ -56,7 +64,7 @@
       const videoElement = document.createElement('video');
       videoElement.className = 'video-element';
       videoElement.controls = true;
-      videoElement.autoplay = false;
+      videoElement.autoplay = true;
 
       // Check if HLS.js is supported
       if (Hls.isSupported()) {
@@ -89,13 +97,13 @@
 
     function showPicker() {
       document.getElementById('channelPicker').style.display = 'block';
-      document.getElementById('videoContainer').style.height = '90%';
+      document.getElementById('videoContainer').style.height = 'calc(90% - 10px)'; /* Adjusted to fit within 90% of the screen */
       document.getElementById('backButton').style.display = 'none';
     }
 
     document.getElementById('backButton').addEventListener('click', function() {
       document.getElementById('channelPicker').style.display = 'block';
-      document.getElementById('videoContainer').style.height = '90%';
+      document.getElementById('videoContainer').style.height = 'calc(90% - 10px)'; /* Adjusted to fit within 90% of the screen */
       document.getElementById('backButton').style.display = 'none';
     });
 
