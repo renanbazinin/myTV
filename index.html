@@ -34,12 +34,17 @@
       height: 100%;
       object-fit: contain; /* Adjust the value as needed (contain, cover, etc.) */
     }
+    img{
+      width: 60px;
+      height: 55px;
+    }
   
     .channel-button {
+
       display: inline-block;
       margin: 5px;
       padding: 5px;
-      border: none;
+      
       cursor: pointer;
     }
   
@@ -97,13 +102,13 @@
 
     function showPicker() {
       document.getElementById('channelPicker').style.display = 'block';
-      document.getElementById('videoContainer').style.height = 'calc(90% - 10px)'; /* Adjusted to fit within 90% of the screen */
+     // document.getElementById('videoContainer').style.height = 'calc(90% - 5px)'; /* Adjusted to fit within 90% of the screen */
       document.getElementById('backButton').style.display = 'none';
     }
 
     document.getElementById('backButton').addEventListener('click', function() {
       document.getElementById('channelPicker').style.display = 'block';
-      document.getElementById('videoContainer').style.height = 'calc(90% - 10px)'; /* Adjusted to fit within 90% of the screen */
+    //  document.getElementById('videoContainer').style.height = 'calc(90% - 5px)'; /* Adjusted to fit within 90% of the screen */
       document.getElementById('backButton').style.display = 'none';
     });
 
