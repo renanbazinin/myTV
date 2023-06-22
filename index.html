@@ -1,147 +1,162 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Streaming Example</title>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-    }
-  
-    #channelPicker {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 10%;
-      background-color: #f1f1f1;
-      padding: 10px;
-    }
-  
-    #videoContainer {
-      position: fixed;
-      top: 10%;
-      left: 0;
-      width: 100%;
-      height: calc(90% - 10px); /* Adjusted to fit within 90% of the screen */
-      overflow: hidden;
-    }
-  
-    .video-element {
-      width: 100%;
-      height: 100%;
-      object-fit: contain; /* Adjust the value as needed (contain, cover, etc.) */
-    }
-    img{
-      width: 60px;
-      height: 55px;
-    }
-  
-    .channel-button {
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>Streaming Example</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+    
+      #channelPicker {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 10%;
+        background-color: #f1f1f1;
+        padding: 10px;
+      }
+    
+      #videoContainer {
+        position: fixed;
+        top: 10%;
+        left: 0;
+        width: 100%;
+        height: calc(90% - 10px); /* Adjusted to fit within 90% of the screen */
+        overflow: hidden;
+      }
+    
+      .video-element {
+        width: 100%;
+        height: 100%;
+        object-fit: contain; /* Adjust the value as needed (contain, cover, etc.) */
+      }
+      img{
+        width: 60px;
+        height: 55px;
+      }
+    
+      .channel-button {
 
-      display: inline-block;
-      margin: 5px;
-      padding: 5px;
-      
-      cursor: pointer;
-    }
-  
-    #backButton {
-      position: fixed;
-      top: 0;
-      right: 0;
-      padding: 10px;
-      cursor: pointer;
-      background-color: #ccc;
-    }
-  </style>
-  
-</head>
-<body>
-  <div id="channelPicker"></div>
-  <div id="videoContainer"></div>
-  <div id="backButton">Back</div>
+        display: inline-block;
+        margin: 5px;
+        padding: 5px;
+        
+        cursor: pointer;
+      }
+    
+      #backButton {
+        position: fixed;
+        top: 0;
+        right: 0;
+        padding: 10px;
+        cursor: pointer;
+        background-color: #ccc;
+      }
+    </style>
+    
+  </head>
+  <body>
+    <div id="channelPicker"></div>
+    <div id="videoContainer"></div>
+    <div id="backButton">Back</div>
 
-  <script>
-    function playStream(url) {
-      const videoElement = document.createElement('video');
-      videoElement.className = 'video-element';
-      videoElement.controls = true;
-      videoElement.autoplay = true;
+    <script>
 
-      // Check if HLS.js is supported
-      if (Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(url);
-        hls.attachMedia(videoElement);
-      } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-        // If native HLS is supported
-        videoElement.src = url;
-      } else {
-        console.error('HLS is not supported');
+
+
+      function playStream(url) {
+        const videoElement = document.createElement('video');
+        videoElement.className = 'video-element';
+        videoElement.controls = true;
+        videoElement.autoplay = true;
+
+        // Check if HLS.js is supported
+        if (Hls.isSupported()) {
+          const hls = new Hls();
+          hls.loadSource(url);
+          hls.attachMedia(videoElement);
+        } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+          // If native HLS is supported
+          videoElement.src = url;
+        } else {
+          console.error('HLS is not supported');
+        }
+
+        document.getElementById('videoContainer').innerHTML = '';
+        document.getElementById('videoContainer').appendChild(videoElement);
+
+        // Hide back button when playing video
+        document.getElementById('backButton').style.display = 'none';
       }
 
-      document.getElementById('videoContainer').innerHTML = '';
-      document.getElementById('videoContainer').appendChild(videoElement);
+      function createButton(name, logo, url) {
+        var button = document.createElement('button');
+        button.className = 'channel-button';
+        button.innerHTML = '<img src="' + logo + '" alt="' + name + '" width="100" height="100">';
+        button.addEventListener('click', function() {
+          if (url.includes('ke12.m3u8')) {
+        const iframe = document.createElement('iframe');
+        iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        iframe.allowfullscreen = true;
 
-      // Hide back button when playing video
-      document.getElementById('backButton').style.display = 'none';
-    }
-
-    function createButton(name, logo, url) {
-      var button = document.createElement('button');
-      button.className = 'channel-button';
-      button.innerHTML = '<img src="' + logo + '" alt="' + name + '" width="100" height="100">';
-      button.addEventListener('click', function() {
+        document.getElementById('videoContainer').innerHTML = '';
+        document.getElementById('videoContainer').appendChild(iframe);
+      } else {
         playStream(url);
+      }
       });
-      return button;
-    }
+        return button;
+      }
 
-    function showPicker() {
-      document.getElementById('channelPicker').style.display = 'block';
-     // document.getElementById('videoContainer').style.height = 'calc(90% - 5px)'; /* Adjusted to fit within 90% of the screen */
-      document.getElementById('backButton').style.display = 'none';
-    }
+      function showPicker() {
+        document.getElementById('channelPicker').style.display = 'block';
+      // document.getElementById('videoContainer').style.height = 'calc(90% - 5px)'; /* Adjusted to fit within 90% of the screen */
+        document.getElementById('backButton').style.display = 'none';
+      }
 
-    document.getElementById('backButton').addEventListener('click', function() {
-      document.getElementById('channelPicker').style.display = 'block';
-    //  document.getElementById('videoContainer').style.height = 'calc(90% - 5px)'; /* Adjusted to fit within 90% of the screen */
-      document.getElementById('backButton').style.display = 'none';
-    });
-
-    fetch('https://raw.githubusercontent.com/renanbazinin/myM3U/main/directLiveNamesDiffandEPG1.m3u')
-      .then(response => response.text())
-      .then(data => {
-        const lines = data.split(/\r?\n/);
-        const channels = [];
-        let currentChannel = {};
-
-        lines.forEach(line => {
-          if (line.startsWith('#EXTINF:-1')) {
-            if (currentChannel.name && currentChannel.logo && currentChannel.url) {
-              channels.push(currentChannel);
-              currentChannel = {};
-            }
-            const nameMatch = line.match(/tvg-id="([^"]+)"/);
-            const logoMatch = line.match(/tvg-logo="([^"]+)"/);
-            if (nameMatch && logoMatch) {
-              currentChannel.name = nameMatch[1];
-              currentChannel.logo = logoMatch[1];
-            }
-          } else if (line.trim() !== '' && !line.startsWith('#')) {
-            currentChannel.url = line;
-          }
-        });
-
-        const channelPicker = document.getElementById('channelPicker');
-        channels.forEach(channel => {
-          const button = createButton(channel.name, channel.logo, channel.url);
-          channelPicker.appendChild(button);
-        });
+      document.getElementById('backButton').addEventListener('click', function() {
+        document.getElementById('channelPicker').style.display = 'block';
+      //  document.getElementById('videoContainer').style.height = 'calc(90% - 5px)'; /* Adjusted to fit within 90% of the screen */
+        document.getElementById('backButton').style.display = 'none';
       });
-  </script>
-</body>
-</html>
+
+      fetch('https://raw.githubusercontent.com/renanbazinin/myM3U/main/directLiveNamesDiffandEPG1.m3u')
+        .then(response => response.text())
+        .then(data => {
+          const lines = data.split(/\r?\n/);
+          const channels = [];
+          let currentChannel = {};
+
+          lines.forEach(line => {
+            if (line.startsWith('#EXTINF:-1')) {
+              if (currentChannel.name && currentChannel.logo && currentChannel.url) {
+                channels.push(currentChannel);
+                currentChannel = {};
+              }
+              const nameMatch = line.match(/tvg-id="([^"]+)"/);
+              const logoMatch = line.match(/tvg-logo="([^"]+)"/);
+              if (nameMatch && logoMatch) {
+                currentChannel.name = nameMatch[1];
+                currentChannel.logo = logoMatch[1];
+              }
+            } else if (line.trim() !== '' && !line.startsWith('#')) {
+              currentChannel.url = line;
+            }
+          });
+
+          const channelPicker = document.getElementById('channelPicker');
+          channels.forEach(channel => {
+            const button = createButton(channel.name, channel.logo, channel.url);
+            channelPicker.appendChild(button);
+          });
+        });
+    </script>
+  </body>
+  </html>
