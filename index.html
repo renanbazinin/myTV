@@ -70,6 +70,7 @@
     }
 
     /* Added CSS for adjusting channel button height */
+    
     @media screen and (max-height: 600px) {
       .channel-button {
         width: 100px; /* Adjust the width as needed */
@@ -90,6 +91,7 @@
     #showUSChannels {
       order: 9999;
     }
+    
     @media screen and (orientation: portrait) and (min-height: 600px) and (min-width: 600px) {
       .channel-button {
         width: 120px; /* Adjust the width as needed */
@@ -107,6 +109,19 @@
       
       }
     }
+
+    @media screen and (orientation: landscape) and (min-width: calc(2 * 600px)) {
+      .channel-button {
+        width: 75px; /* Adjust the width as needed */
+        height: 75px; /* Adjust the height as needed */
+        font-size: 14px; /* Adjust the font size as needed */
+      }
+      
+      #supportButton {
+        top: 10px;
+      }
+    }
+    
     
   </style>
   
