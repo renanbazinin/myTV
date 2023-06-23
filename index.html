@@ -24,8 +24,7 @@
     }
 
     #supportButton {
-      position: absolute;
-      top: 10px;
+      position: fixed;
       right: 10px;
       z-index: 1; /* Ensure it appears above other elements */
     }
@@ -48,6 +47,16 @@
     img {
       width: 60px;
       height: 55px;
+    }
+
+    .channel-button-support{
+
+      margin: 5px;
+      padding: 5px;
+      cursor: pointer;
+      background-color: #424242; /* Darker button background color */
+      border: none;
+      color: #fff; /* Light button text color */
     }
 
     .channel-button {
@@ -81,13 +90,31 @@
     #showUSChannels {
       order: 9999;
     }
+    @media screen and (orientation: portrait) and (min-height: 600px) and (min-width: 600px) {
+      .channel-button {
+        width: 120px; /* Adjust the width as needed */
+        height: 120px; /* Adjust the height as needed */
+       font-size: 16px;   /*Adjust the font size as needed */
+      }
+       #supportButton{
+        position: fixed;
+  
+        width: 120px; /* Adjust the width as needed */
+        height: 120px; /* Adjust the height as needed */
+
+        bottom: 1;
+     
+      
+      }
+    }
+    
   </style>
   
 </head>
 <body>
   <div id="channelPicker">
     <a id="supportButton" href="https://www.buymeacoffee.com/renanbazinin" target="_blank">
-      <button class="channel-button">Support Me</button>
+      <button class="channel-button-support">Support Me</button>
     </a>
   </div>
 
@@ -175,7 +202,7 @@
           supportButton.href = 'https://www.buymeacoffee.com/renanbazinin';
           supportButton.target = '_blank';
           const supportButtonInner = document.createElement('button');
-          supportButtonInner.className = 'channel-button';
+          supportButtonInner.className = 'channel-button-support';
           supportButtonInner.textContent = 'Support Me';
           supportButton.appendChild(supportButtonInner);
           document.body.appendChild(supportButton);
