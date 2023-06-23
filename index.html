@@ -137,6 +137,27 @@
       width: 100%;
       height: 100%;
     }
+
+
+    #toggleButton {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      padding: 10px;
+      cursor: pointer;
+      background-color: #424242; /* Darker button background color */
+      border: none;
+      color: #fff; /* Light button text color */
+      z-index: 3;
+    }
+    
+    #toggleButton:hover {
+      background-color: #616161; /* Darker button background color on hover */
+    }
+    
+    #toggleButton.hidden {
+      display: none;
+    }
     
   </style>
   
@@ -150,8 +171,11 @@
 
   <div id="videoContainer"></div>
   <div id="backButton"></div>
+  <div id="toggleButton">Hide</div>
 
   <script>
+    let isPickerVisible = true;
+    const toggleButton = document.getElementById('toggleButton');
     let isFilterApplied = true;
 
     function playStream(url) {
@@ -219,7 +243,30 @@
       //  document.getElementById('videoContainer').style.height = 'calc(90% - 5px)'; /* Adjusted to fit within 90% of the screen */
       document.getElementById('backButton').style.display = 'none';
     });
+    function showPicker() {
+      channelPicker.style.display = 'flex'
+      backButton.style.display = 'none';
+      toggleButton.classList.remove('hidden');
+      toggleButton.innerHTML = "Hide"
+    }
 
+    function hidePicker() {
+      channelPicker.style.display = 'none';
+      backButton.style.display = 'none';
+      toggleButton.classList.remove('hidden');
+      toggleButton.innerHTML = "Show"
+    }
+
+    function togglePicker() {
+      if (isPickerVisible) {
+        hidePicker();
+      } else {
+        showPicker();
+      }
+      isPickerVisible = !isPickerVisible;
+    }
+
+    toggleButton.addEventListener('click', togglePicker);
     function start() {
       fetch('https://raw.githubusercontent.com/renanbazinin/myM3U/main/directLiveNamesDiffandEPG1.m3u')
         .then(response => response.text())
