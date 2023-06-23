@@ -16,6 +16,7 @@
     }
 
     #channelPicker {
+      z-index: 2;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -30,6 +31,7 @@
     }
     
     #videoContainer {
+      z-index: 1;
       position: fixed;
       top: 10%;
       left: 0;
@@ -110,7 +112,7 @@
       }
     }
 
-    @media screen and (orientation: landscape) and (min-width: calc(2 * 600px)) {
+    @media screen and (orientation: landscape) and (min-width: calc(1.5 * 600px)) {
       .channel-button {
         width: 75px; /* Adjust the width as needed */
         height: 75px; /* Adjust the height as needed */
