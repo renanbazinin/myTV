@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+        #channelPicker {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-bottom: 20px;
+        }
+        .channel-button {
+          padding: 10px;
+        }
+        #videoContainer {
+          width: 100%;
+          height: 700px;
+        }
+        .thumbnail-img {
+          width: 100px;
+          height: auto;
+        }
+      </style>
+  </head>
+  <body>
+    <div id="channelPicker"></div>
+    <div id="videoContainer"></div>
+
+    <script>
+    
+    function createButton(name, url, thumbnailUrl) {
+  var button = document.createElement('button');
+  button.className = 'channel-button';
+
+  // Create a container div for the thumbnail and caption
+  var container = document.createElement('div');
+  container.style.textAlign = 'center';
+
+  // Create an image element for the thumbnail icon
+  var thumbnailImg = document.createElement('img');
+  thumbnailImg.src = thumbnailUrl;
+  thumbnailImg.alt = name;
+  thumbnailImg.style.width = '50px'; // Set the width of the thumbnail icon
+  thumbnailImg.style.height = 'auto'; // Maintain aspect ratio
+
+  // Create a span element for the caption
+  var caption = document.createElement('span');
+  caption.textContent = name;
+  caption.style.fontSize = '12px'; // Set the font size of the caption
+  caption.style.display = 'block'; // Place the caption below the thumbnail image
+
+  // Append the thumbnail and caption to the container
+  container.appendChild(thumbnailImg);
+  container.appendChild(caption);
+
+  // Add the container to the button
+  button.appendChild(container);
+
+  // Add a click event listener to display the video
+  button.addEventListener('click', function() {
+    const iframe = document.createElement('iframe');
+    iframe.src = url + '&autoplay=1'; // Add the autoplay parameter to the URL
+ 
+    iframe.src = url;
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = 'none';
+    iframe.allowfullscreen = true;
+
+    document.getElementById('videoContainer').innerHTML = '';
+    document.getElementById('videoContainer').appendChild(iframe);
+
+    document.getElementById('videoContainer').scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+
+
+  });
+
+  
+  return button;
+}
+const playlist = [
+  {
+    name: 'הרצאה 1- מבוא לטורים',
+    url: 'https://www.youtube.com/embed/ydmgyXigwIM?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/r614AD021n0/maxresdefault.jpg',
+  },
+  {
+    name: 'הרצאה 2- מבוא לטורים המשך',
+    url: 'https://www.youtube.com/embed/Pib6Uc4IHCE?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/-YcQu_rZYSE/maxresdefault.jpg',
+  },
+  {
+    name: 'הרצאה 3- טורים חיוביים',
+    url: 'https://www.youtube.com/embed/geTRsldYrXY?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://www.idealminischool.ca/idealpedia/images/thumb/2/2e/Infinite_Geometric_Series.png/300px-Infinite_Geometric_Series.png',
+  },
+  {
+    name: 'הרצאה 4- טורים חיוביים',
+    url: 'https://www.youtube.com/embed/8ML8dMj-4iY?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://d138zd1ktt9iqe.cloudfront.net/media/seo_landing_files/geometric-series-formulas-1650451222.png',
+  },
+  {
+    name: 'הרצאה 5- טורים כללים.',
+    url: 'https://www.youtube.com/embed/tLiJwStsegU?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://www.idealminischool.ca/idealpedia/images/thumb/2/2e/Infinite_Geometric_Series.png/300px-Infinite_Geometric_Series.png',
+  },
+  {
+    name: 'הרצאה 6- טורי טיילור מוטיבציה.',
+    url: 'https://www.youtube.com/embed/fX_bw3By5EU?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/LDBnS4c7YbA/maxresdefault.jpg',
+  },
+  {
+    name: 'הרצאה 7- שארית לגרנז\'.',
+    url: 'https://www.youtube.com/embed/mz0LZ4ovHJM?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/a58otkmkHtk/maxresdefault.jpg',
+  },
+  {
+    name: 'הרצאה 8- טורי טיילור + שיטת ההצבה',
+    url: 'https://www.youtube.com/embed/Lr3VkMjzLtM?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.imgur.com/ca0Nrwm.png',
+  },
+  {
+    name: 'הרצאה 9- אינטגרציה בחלקים',
+    url: 'https://www.youtube.com/embed/9JUY3myJi_4?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.imgur.com/2mGwlbv.png',
+  },
+  {
+    name: 'הרצאה 10- אינטגרל של פונקצית מנה',
+    url: 'https://www.youtube.com/embed/h6FaojU4mqE?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.imgur.com/TMhhfhQ.png',
+  },
+  {
+    name: 'הרצאה 11- אינטגרל מסויים',
+    url: 'https://www.youtube.com/embed/z6kOTv7Ish0?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.imgur.com/4ZcMJzx.png',
+  },
+  {
+    name: 'הרצאה 12- המשפט היסודי',
+    url: 'https://www.youtube.com/embed/oh_qPQyfN5U?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.imgur.com/4ZcMJzx.png',
+  },
+  {
+    name: 'הרצאה 13- המשפט היסודי המשך',
+    url: 'https://www.youtube.com/embed/qC6J-fvExy8?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/JVWZbGePDNk/hq720.jpg',
+  },
+  {
+    name: 'הרצאה 14- חזרה',
+    url: 'https://www.youtube.com/embed/t-Ao5pY-WnM?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.imgur.com/4ZcMJzx.png',
+  },
+  {
+    name: 'הרצאה 15- אינטגרל לא אמיתי מסוג ראשון',
+    url: 'https://www.youtube.com/embed/fMkVFQSv8vQ?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.imgur.com/4ZcMJzx.png',
+  },
+  {
+    name: 'הרצאה 16- חזרה',
+    url: 'https://www.youtube.com/embed/pkQsKtDCH1M?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/pkQsKtDCH1M/hqdefault.jpg',
+  },
+  {
+    name: 'הרצאה 17- מבחן האינטגרל ואינטגרל לא אמיתי מסוג שני',
+    url: 'https://www.youtube.com/embed/SEBP4Pwd_08?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/SEBP4Pwd_08/hqdefault.jpg',
+  },
+  {
+    name: 'הרצאה 18- תחום הגדרה וקווי גובהה',
+    url: 'https://www.youtube.com/embed/HP8mwgmV-xE?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/HP8mwgmV-xE/hqdefault.jpg',
+  },
+  {
+    name: 'הרצאה 19- גבול של פונקציה השני משתנים',
+    url: 'https://www.youtube.com/embed/rgnwMvdCn_c?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/rgnwMvdCn_c/hqdefault.jpg',
+  },
+  {
+    name: 'הרצאה 20- פונקציה בשני משתנים - רציפות ונגזרות חלקיות.',
+    url: 'https://www.youtube.com/embed/=_H99R0wtyvk?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/=_H99R0wtyvk/hqdefault.jpg',
+  },
+  {
+    name: 'הרצאה 21- דיפרנציאביליות',
+    url: 'https://www.youtube.com/embed/1JJF4-bWMls?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/1JJF4-bWMls/hqdefault.jpg',
+  },
+  {
+    name: 'הרצאה 22- קירוב לינארית וכלל השרשרתך',
+    url: 'https://www.youtube.com/embed/1mTrRsJyVPE?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/1mTrRsJyVPE/hqdefault.jpg',
+  },
+  {
+    name: 'הרצאה 23- נקודות קיצון',
+    url: 'https://www.youtube.com/embed/U4hrJYQnQS8?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/U4hrJYQnQS8/hqdefault.jpg',
+  },
+  {
+    name: 'הרצאה 24- שיעור חזרה',
+    url: 'https://www.youtube.com/embed/Au8XDnqG90?list=PLKtmT6p9xoPp98fj6NHu7cTMp-AkvcIUN',
+    thumbnail: 'https://i.ytimg.com/vi/Au8XDnqG90/hqdefault.jpg',
+  },
+];
+
+      const channelPicker = document.getElementById('channelPicker');
+playlist.forEach(video => {
+  const button = createButton(video.name, video.url, video.thumbnail);
+  channelPicker.appendChild(button);
+});
+    </script>
+  </body>
+</html>
+
