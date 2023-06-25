@@ -70,12 +70,12 @@
   button.addEventListener('click', function() {
     const iframe = document.createElement('iframe');
     iframe.src = url + '&autoplay=1'; // Add the autoplay parameter to the URL
- 
-    iframe.src = url;
+
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.style.border = 'none';
     iframe.allowfullscreen = true;
+    iframe.setAttribute('allowFullScreen', '');
 
     document.getElementById('videoContainer').innerHTML = '';
     document.getElementById('videoContainer').appendChild(iframe);
