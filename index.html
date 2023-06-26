@@ -349,6 +349,19 @@
     window.onload = function() {
       start();
     };
+    let timeout = null;
+
+
+    function showButton() {
+    clearTimeout(timeout);
+      toggleButton.style.opacity = '0.56';
+      timeout = setTimeout(function () {
+        toggleButton.style.opacity = '0';
+      }, 3000); // Hide after 3 seconds of inactivity
+    }
+    window.addEventListener('mousemove', showButton);
+window.addEventListener('touchmove', showButton);
+
   </script>
 </body>
 </html>
