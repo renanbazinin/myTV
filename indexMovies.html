@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>RENAN TV</title>
+  
+  <link rel="icon" href="https://i.imgur.com/opmOlZ5.png" type="image/x-icon">
+            
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #121212; /* Dark background color */
+      color: #fff; /* Light text color */
+    }
+
+    
+    #channelPicker {
+      
+      z-index: 3;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      position: relative;
+    }
+
+    #supportButton {
+      position: fixed;
+      right: 10px;
+      z-index: 4; /* Ensure it appears above other elements */
+    }
+    
+    #videoContainer {
+      z-index: 1;
+      position: fixed;
+      top: 10%;
+      left: 0;
+      width: 100%;
+      height: calc(90% - 10px); /* Adjusted to fit within 90% of the screen */
+      overflow: hidden;
+    }
+
+    .video-element {
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* Adjust the value as needed (contain, cover, etc.) */
+    }
+
+    img {
+      max-width: 100%; /* Adjust the percentage as needed */
+  max-height: 90%; /* Adjust the percentage as needed */
+  display: block; /* Centers the image */
+  margin: auto; /* Centers the image */
+    }
+
+    .channel-button-support{
+      border-radius: 10px;
+      margin: 5px;
+      padding: 5px;
+      cursor: pointer;
+      background-color: #424242; /* Darker button background color */
+      border: none;
+      color: #fff; /* Light button text color */
+    }
+
+    .channel-button {
+      border-radius: 5px;
+
+      display: inline-block;
+      margin: 5px;
+      padding: 5px;
+      cursor: pointer;
+      background-color: #424242; /* Darker button background color */
+      border: none;
+      color: #fff; /* Light button text color */
+    }
+
+    /* Added CSS for adjusting channel button height */
+    
+    @media screen and (max-height: 600px) {
+      .channel-button {
+        width: 100px; /* Adjust the width as needed */
+        height: 60px; /* Adjust the height as needed */
+        font-size: 12px; /* Adjust the font size as needed */
+      }
+    }
+
+    #backButton {
+      position: fixed;
+      top: 0;
+      right: 0;
+      padding: 10px;
+      cursor: pointer;
+      
+      color: #fff; /* Light back button text color */
+    }
+    #showUSChannels {
+      order: 9999;
+    }
+    
+    @media screen and (orientation: portrait) and (min-height: 600px) and (min-width: 600px) {
+      .channel-button {
+        width: 120px; /* Adjust the width as needed */
+        height: 120px; /* Adjust the height as needed */
+       font-size: 16px;   /*Adjust the font size as needed */
+      }
+       #supportButton{
+        position: fixed;
+  
+        width: 120px;  
+        height: 120px; 
+
+        bottom: 1;
+     
+      
+      }
+      #toggleButton{
+        bottom: 8% !important;
+
+
+      }
+    }
+
+    @media screen and (orientation: landscape) and (min-width: calc(1.5 * 600px)) {
+      .channel-button {
+        width: 75px; /* Adjust the width as needed */
+        height: 75px; /* Adjust the height as needed */
+        font-size: 14px; /* Adjust the font size as needed */
+      }
+      
+      #supportButton {
+        top: 10px;
+      }
+    }
+        /* Added CSS for adjusting iframe size */
+        .iframe-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      padding-bottom: 56.25%; /* 16:9 aspect ratio */
+    }
+    .iframe-container iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+
+    #toggleButton {
+      position: fixed;
+        bottom: 12%; 
+        right: 8px;
+        padding: 10px;
+        cursor: pointer;
+        background-color: #424242;
+        border: none;
+        color: #fff;
+        z-index: 5;
+        opacity: 0.56; 
+        border-radius: 10px;
+
+    }
+    
+    #toggleButton:hover {
+      background-color: #616161; /* Darker button background color on hover */
+    }
+    
+    #toggleButton.hidden {
+      display: none;
+    }
+    
+  </style>
+  
+</head>
+<body>
+  <div id="channelPicker">
+    <a id="supportButton" href="https://www.buymeacoffee.com/renanbazinin" target="_blank">
+      <button class="channel-button-support">Support Me</button>
+    </a>
+  </div>
+
+  <div id="videoContainer"></div>
+  <div id="backButton"></div>
+  <div id="toggleButton">Hide</div>
+
+  <script>
+    let isPickerVisible = true;
+    const toggleButton = document.getElementById('toggleButton');
+    let isFilterApplied = true;
+
+    function playStreamRaw(url) {
+      fetch(url,{ redirect: 'follow' })
+        .then(response => response.text())
+        .then(data => {
+          console.log(data); // Log the contents of the M3U8 file
+          const videoElement = document.createElement('video');
+          videoElement.className = 'video-element';
+          videoElement.controls = true;
+          videoElement.autoplay = true;
+
+          // Check if HLS.js is supported
+          if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(data);
+            hls.attachMedia(videoElement);
+          } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+            // If native HLS is supported
+            videoElement.src = data;
+          } else {
+            console.error('HLS is not supported');
+          }
+
+      document.getElementById('videoContainer').innerHTML = '';
+      document.getElementById('videoContainer').appendChild(videoElement);
+
+      // Hide back button when playing video
+      document.getElementById('backButton').style.display = 'none';
+        })
+        .catch(error => {
+          console.error('Error:', error);
+        });
+  
+}
+
+    function playStream(url) {
+      const videoElement = document.createElement('video');
+      videoElement.className = 'video-element';
+      videoElement.controls = true;
+      videoElement.autoplay = true;
+
+      // Check if HLS.js is supported
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(videoElement);
+      } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+        // If native HLS is supported
+        videoElement.src = url;
+      } else {
+        console.error('HLS is not supported');
+      }
+
+      document.getElementById('videoContainer').innerHTML = '';
+      document.getElementById('videoContainer').appendChild(videoElement);
+
+      // Hide back button when playing video
+      document.getElementById('backButton').style.display = 'none';
+    }
+
+    function createButton(name, logo, url, groupTitle) {
+      console.log("groupTitle=" + groupTitle);
+      console.log("isFilterApplied=" + isFilterApplied);
+      
+      if (groupTitle != "Israel" && isFilterApplied) {
+        return;
+      }
+  
+      var button = document.createElement('button');
+      button.className = 'channel-button';
+      button.innerHTML = '<img src="' + logo + '" alt="' + name + '" width="100" height="100">';
+      button.addEventListener('click', function() {
+        if (url.includes('php?m3u8') ) {
+          const iframe = document.createElement('iframe');
+          iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
+          iframe.style.width = '100%';
+          iframe.style.height = '100%';
+          iframe.style.border = 'none';
+          iframe.allowfullscreen = true;
+
+          document.getElementById('videoContainer').innerHTML = '';
+          document.getElementById('videoContainer').appendChild(iframe);
+          playStreamRaw(url)
+        } else {
+          playStream(url);
+        }
+      });
+      return button;
+    }
+
+    function showPicker() {
+      document.getElementById('channelPicker').style.display = 'block';
+      // document.getElementById('videoContainer').style.height = 'calc(90% - 5px)'; /* Adjusted to fit within 90% of the screen */
+      document.getElementById('backButton').style.display = 'none';
+    }
+
+    document.getElementById('backButton').addEventListener('click', function() {
+      document.getElementById('channelPicker').style.display = 'block';
+      //  document.getElementById('videoContainer').style.height = 'calc(90% - 5px)'; /* Adjusted to fit within 90% of the screen */
+      document.getElementById('backButton').style.display = 'none';
+    });
+    function showPicker() {
+      channelPicker.style.display = 'flex'
+      backButton.style.display = 'none';
+      toggleButton.classList.remove('hidden');
+      toggleButton.innerHTML = "Hide"
+    }
+
+    function hidePicker() {
+      channelPicker.style.display = 'none';
+      backButton.style.display = 'none';
+      toggleButton.classList.remove('hidden');
+      toggleButton.innerHTML = "Show"
+    }
+
+    function togglePicker() {
+      if (isPickerVisible) {
+        hidePicker();
+      } else {
+        showPicker();
+      }
+      isPickerVisible = !isPickerVisible;
+    }
+
+    toggleButton.addEventListener('click', togglePicker);
+    function start() {
+      fetch('https://raw.githubusercontent.com/renanbazinin/myM3U/main/directLiveNamesDiffandEPG1.m3u')
+        .then(response => response.text())
+        .then(data => {
+          const channelPicker = document.getElementById('channelPicker');
+          channelPicker.innerHTML = '';
+
+          const supportButton = document.createElement('a');
+          supportButton.id = 'supportButton';
+          supportButton.href = 'https://www.buymeacoffee.com/renanbazinin';
+          supportButton.target = '_blank';
+          const supportButtonInner = document.createElement('button');
+          supportButtonInner.className = 'channel-button-support';
+          supportButtonInner.textContent = 'Support Me';
+          supportButton.appendChild(supportButtonInner);
+          document.body.appendChild(supportButton);
+
+          if (isFilterApplied) {
+            const showUSChannelsButton = document.createElement('button');
+            showUSChannelsButton.id = 'showUSChannels';
+            showUSChannelsButton.className = 'channel-button';
+          
+            showUSChannelsButton.innerHTML = '<img src="https://i.imgur.com/lUKWqOA.png" style="height:40px"></img><br/>show US';
+         
+            channelPicker.appendChild(showUSChannelsButton);
+            document.getElementById('showUSChannels').addEventListener('click', function() {
+              isFilterApplied = false;
+              start();
+            });
+          }
+
+          const lines = data.split(/\r?\n/);
+          const channels = [];
+          let currentChannel = {};
+
+          lines.forEach(line => {
+            if (line.startsWith('#EXTINF:-1')) {
+              if (currentChannel.name && currentChannel.logo && currentChannel.url) {
+                channels.push(currentChannel);
+                currentChannel = {};
+              }
+              const nameMatch = line.match(/tvg-id="([^"]+)"/);
+              const logoMatch = line.match(/tvg-logo="([^"]+)"/);
+              const groupTitleMatch = line.match(/group-title="([^"]+)"/);
+              if (nameMatch && logoMatch) {
+                currentChannel.name = nameMatch[1];
+                currentChannel.logo = logoMatch[1];
+                currentChannel.groupTitle = groupTitleMatch[1];
+              }
+            } else if (line.trim() !== '' && !line.startsWith('#')) {
+              currentChannel.url = line;
+            }
+          });
+          
+
+          channels.forEach(channel => {
+            const button = createButton(channel.name, channel.logo, channel.url, channel.groupTitle);
+            channelPicker.appendChild(button);
+          });
+         
+          
+        });
+        
+        
+    }
+
+    window.onload = function() {
+      start();
+    };
+    let timeout = null;
+
+
+    function showButton() {
+    clearTimeout(timeout);
+      toggleButton.style.opacity = '0.56';
+      timeout = setTimeout(function () {
+        toggleButton.style.opacity = '0';
+      }, 3500); // 
+    }
+    window.addEventListener('mousemove', showButton);
+window.addEventListener('touchmove', showButton);
+
+  </script>
+</body>
+</html>
