@@ -261,7 +261,7 @@
       button.innerHTML = '<img src="' + logo + '" alt="' + name + '" width="100" height="100">';
       button.addEventListener('click', function() {
         if (url.includes('php?m3u8') ) {
-          /* */
+          /* 
           const iframe = document.createElement('iframe');
           iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
           iframe.style.width = '100%';
@@ -274,6 +274,8 @@
          
           //playStreamRaw('https://rotterxmltodata.onrender.com/m3u');
           playStreamRaw(url)
+          */
+          playStream('https://rotterxmltodata.onrender.com/m3u');
         } else {
           playStream(url);
         }
