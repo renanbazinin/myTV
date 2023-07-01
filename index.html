@@ -193,33 +193,44 @@
     let isFilterApplied = true;
 
     function playStreamRaw(url) {
-  fetch(url)
-    .then(response => response.text())
-    .then(data => {
-      
       const videoElement = document.createElement('video');
       videoElement.className = 'video-element';
       videoElement.controls = true;
       videoElement.autoplay = true;
 
-      // Check if HLS.js is supported
-      if (Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(data.trim()); // using data instead of url, because data now contains the real .m3u8 link
-        hls.attachMedia(videoElement);
-      } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-        // If native HLS is supported
-        videoElement.src = data.trim(); // using data instead of url, because data now contains the real .m3u8 link
-      } else {
-        console.error('HLS is not supported');
-      }
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url);
+      xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
+      xhr.setRequestHeader('Access-Control-Allow-Headers', 'origin,range,hdntl,hdnts,CMCD-Request,CMCD-Object,CMCD-Status,CMCD-Session');
+
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          const responseUrl = xhr.responseURL;
+          if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(responseUrl);
+            hls.attachMedia(videoElement);
+          } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+            videoElement.src = responseUrl;
+          } else {
+            console.error('HLS is not supported');
+          }
+        } else {
+          console.error('Request failed with status:', xhr.status);
+        }
+      };
+
+      xhr.onerror = function() {
+        console.error('Request failed');
+      };
+
+      xhr.send();
 
       document.getElementById('videoContainer').innerHTML = '';
       document.getElementById('videoContainer').appendChild(videoElement);
 
       // Hide back button when playing video
       document.getElementById('backButton').style.display = 'none';
-    });
 }
 
 
@@ -259,9 +270,10 @@
       var button = document.createElement('button');
       button.className = 'channel-button';
       button.innerHTML = '<img src="' + logo + '" alt="' + name + '" width="100" height="100">';
-      button.addEventListener('click', function() {
+      button.addEventListener('click', function() { 
+        
         if (url.includes('php?m3u8') ) {
-   
+          /* 
           const iframe = document.createElement('iframe');
           iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
           iframe.style.width = '100%';
@@ -271,12 +283,14 @@
 
           document.getElementById('videoContainer').innerHTML = '';
           document.getElementById('videoContainer').appendChild(iframe);
-         
-          //playStreamRaw('https://rotterxmltodata.onrender.com/m3u');
+            
+   
           //playStreamRaw(url)
-                /* 
+              
           playStream('https://rotterxmltodata.onrender.com/m3u');
-           */
+         */
+           playStreamRaw('https://rotterxmltodata.onrender.com/m3u');
+             
         } else {
           playStream(url);
         }
@@ -401,6 +415,25 @@
     window.addEventListener('mousemove', showButton);
 window.addEventListener('touchmove', showButton);
 
+/*
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    deferredPrompt = e;
+});
+
+const installApp = document.getElementById('installApp');
+
+installApp.addEventListener('click', async () => {
+    if (deferredPrompt !== null) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            deferredPrompt = null;
+        }
+    }
+});
+*/
   </script>
 </body>
 </html>
