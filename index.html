@@ -74,7 +74,42 @@
       display: flex;
       gap: 1rem;
       align-items: center;
-    }    /* Main Layout */
+    }
+
+    #muteButton {
+      display: flex; /* Ensure the button is visible */
+      justify-content: center;
+      align-items: center;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 0.5rem;
+      color: var(--text-primary);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 1.2rem;
+      width: 40px;
+      height: 40px;
+    }
+
+    #muteButton:hover {
+      background: var(--glass-bg);
+      border-color: var(--accent-color);
+      transform: translateY(-2px);
+    }
+
+    #muteButton.muted {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      border-color: #ef4444;
+      color: white;
+    }
+
+    #muteButton.muted:hover {
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
+    }
+
+    /* Main Layout */
     .main-container {
       display: flex;
       margin-top: 55px;
@@ -152,7 +187,7 @@
       margin-bottom: 0.5rem;
       transition: transform 0.3s ease;
     }    .channel-button-support {
-      background: linear-gradient(135deg, var(--accent-color), #8b5cf6);
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
       border: none;
       border-radius: 8px;
       padding: 0.5rem 1rem;
@@ -165,7 +200,7 @@
     }    .channel-button-support:hover {
       transform: translateY(-2px);
       box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
-      background: linear-gradient(135deg, var(--accent-hover), #7c3aed);
+      background: linear-gradient(135deg, #7c3aed, #6d28d9);
     }
 
     .channel-button {
@@ -484,13 +519,46 @@
       transition: all 0.3s ease;
       display: none;
       font-size: 0.9rem;
-    }
-
-    #backButton:hover {
+    }    #backButton:hover {
       background: var(--glass-bg);
       border-color: var(--accent-color);
       transform: translateY(-2px);
-    }/* Remove toggle button styles - using only side menu */
+    }
+
+    #muteButton {
+      display: flex; /* Ensure the button is visible */
+      justify-content: center;
+      align-items: center;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 0.5rem;
+      color: var(--text-primary);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 1.2rem;
+      width: 40px;
+      height: 40px;
+    }
+
+    #muteButton:hover {
+      background: var(--glass-bg);
+      border-color: var(--accent-color);
+      transform: translateY(-2px);
+    }
+
+    #muteButton.muted {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      border-color: #ef4444;
+      color: white;
+    }
+
+    #muteButton.muted:hover {
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
+    }
+
+/* Remove toggle button styles - using only side menu */
 
     /* Special button styling */
     #showUSChannels {
@@ -571,13 +639,14 @@
   </style>
   
 </head>
-<body>  <!-- Header -->
-  <div class="header">
+<body>  <!-- Header -->  <div class="header">
     <div class="header-left">
       <div class="logo">RENAN TV</div>
       <button id="backButton">← Back to Channels</button>
     </div>
-    <div class="header-controls">      <a id="supportButton" href="https://www.buymeacoffee.com/renanbazinin" target="_blank">
+    <div class="header-controls">
+      <button id="muteButton" title="Toggle Mute">🔊</button>
+      <a id="supportButton" href="https://www.buymeacoffee.com/renanbazinin" target="_blank">
         <button class="channel-button-support">Support Me</button>
       </a>
     </div>
@@ -607,8 +676,10 @@
   <script>    let isPickerVisible = true;
     let isMenuVisible = true;
     const sideMenu = document.getElementById('sideMenu');
-    const contentArea = document.getElementById('contentArea');
-    let isFilterApplied = true;    function toggleSideMenu() {
+    const contentArea = document.getElementById('contentArea');    let isFilterApplied = true;    let currentVideoElement = null;
+    let isMuted = true; // Start muted for autoplay compatibility
+
+    function toggleSideMenu() {
       if (isMenuVisible) {
         sideMenu.classList.add('hidden');
         contentArea.classList.add('expanded');
@@ -620,51 +691,37 @@
       }
     }
 
-    function playStreamRaw(url) {
-      const videoElement = document.createElement('video');
-      videoElement.className = 'video-element';
-      videoElement.controls = true;
-      videoElement.autoplay = true;
-
-      const xhr = new XMLHttpRequest();
-      xhr.open('GET', url);
-      xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
-      xhr.setRequestHeader('Access-Control-Allow-Headers', 'origin,range,hdntl,hdnts,CMCD-Request,CMCD-Object,CMCD-Status,CMCD-Session');
-
-      xhr.onload = function() {
-        if (xhr.status === 200) {
-          const responseUrl = xhr.responseURL;
-          if (Hls.isSupported()) {
-            const hls = new Hls();
-            hls.loadSource(responseUrl);
-            hls.attachMedia(videoElement);
-          } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-            videoElement.src = responseUrl;
-          } else {
-            console.error('HLS is not supported');
-          }
+    function toggleMute() {
+      const muteButton = document.getElementById('muteButton');
+      
+      if (currentVideoElement) {
+        isMuted = !isMuted;
+        currentVideoElement.muted = isMuted;
+        
+        if (isMuted) {
+          muteButton.textContent = '🔇';
+          muteButton.classList.add('muted');
+          muteButton.title = 'Unmute';
         } else {
-          console.error('Request failed with status:', xhr.status);
+          muteButton.textContent = '🔊';
+          muteButton.classList.remove('muted');
+          muteButton.title = 'Mute';
         }
-      };
+      }
+    }
 
-      xhr.onerror = function() {
-        console.error('Request failed');
-      };
+    // Add event listener for mute button
+    document.getElementById('muteButton').addEventListener('click', toggleMute);
 
-      xhr.send();
-
-      document.getElementById('videoContainer').innerHTML = '';
-      document.getElementById('videoContainer').appendChild(videoElement);
-
-      // Hide back button when playing video
-      document.getElementById('backButton').style.display = 'none';
-}    function playStream(url) {
+    function playStream(url) {
       const videoElement = document.createElement('video');
       videoElement.className = 'video-element';
       videoElement.controls = true;
       videoElement.autoplay = true;
-      videoElement.muted = true; // Enable muted autoplay for better browser compatibility
+      videoElement.muted = true; // Start muted for autoplay compatibility
+
+      // Store reference to current video element
+      currentVideoElement = videoElement;
 
       // Check if HLS.js is supported
       if (Hls.isSupported()) {
@@ -686,9 +743,17 @@
 
       document.getElementById('videoContainer').innerHTML = '';
       document.getElementById('videoContainer').appendChild(videoElement);
-      document.getElementById('videoContainer').style.display = 'block';      // Hide channel picker and show back button
+      document.getElementById('videoContainer').style.display = 'block';
       document.getElementById('channelPicker').style.display = 'none';
       document.getElementById('backButton').style.display = 'block';
+
+      // Show mute button and update its state
+      updateMuteButtonVisibility(true);
+      const muteButton = document.getElementById('muteButton');
+      muteButton.textContent = '🔇';
+      muteButton.classList.add('muted');
+      muteButton.title = 'Unmute';
+
       isPickerVisible = false;
     }
 
