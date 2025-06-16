@@ -714,50 +714,53 @@
     document.getElementById('muteButton').addEventListener('click', toggleMute);
 
     function playStream(url) {
-      const videoElement = document.createElement('video');
-      videoElement.className = 'video-element';
-      videoElement.controls = true;
-      videoElement.autoplay = true;
-      videoElement.muted = true; // Start muted for autoplay compatibility
+      return new Promise((resolve, reject) => {
+       const videoElement = document.createElement('video');
+       videoElement.className = 'video-element';
+       videoElement.controls = true;
+       videoElement.autoplay = true;
+       videoElement.muted = false; // Start unmuted so clicking a channel auto-plays with sound
+       isMuted = false;
 
-      // Store reference to current video element
-      currentVideoElement = videoElement;
+       // Store reference to current video element
+       currentVideoElement = videoElement;
 
-      // Check if HLS.js is supported
-      if (Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(url);
-        hls.attachMedia(videoElement);
-        hls.on(Hls.Events.MANIFEST_PARSED, function () {
-          videoElement.play().catch(e => console.log('Autoplay failed:', e));
+       // Check if HLS.js is supported
+       if (Hls.isSupported()) {
+         const hls = new Hls();
+         hls.loadSource(url);
+         hls.attachMedia(videoElement);
+         hls.on(Hls.Events.MANIFEST_PARSED, function () {
+          videoElement.play().then(resolve).catch(reject);
         });
-      } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-        // If native HLS is supported
-        videoElement.src = url;
+       } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+         // If native HLS is supported
+         videoElement.src = url;
         videoElement.addEventListener('loadedmetadata', function() {
-          videoElement.play().catch(e => console.log('Autoplay failed:', e));
+          videoElement.play().then(resolve).catch(reject);
         });
-      } else {
-        console.error('HLS is not supported');
-      }
+       } else {
+        reject(new Error('HLS is not supported'));
+       }
 
-      document.getElementById('videoContainer').innerHTML = '';
-      document.getElementById('videoContainer').appendChild(videoElement);
-      document.getElementById('videoContainer').style.display = 'block';
-      document.getElementById('channelPicker').style.display = 'none';
-      document.getElementById('backButton').style.display = 'block';
+       document.getElementById('videoContainer').innerHTML = '';
+       document.getElementById('videoContainer').appendChild(videoElement);
+       document.getElementById('videoContainer').style.display = 'block';
+       document.getElementById('channelPicker').style.display = 'none';
+       document.getElementById('backButton').style.display = 'block';
 
-      // Show mute button and update its state
-      updateMuteButtonVisibility(true);
-      const muteButton = document.getElementById('muteButton');
-      muteButton.textContent = '🔇';
-      muteButton.classList.add('muted');
-      muteButton.title = 'Unmute';
+       // Show mute button and update its state to unmuted
+       updateMuteButtonVisibility(false);
+       const muteButton = document.getElementById('muteButton');
+       muteButton.textContent = '🔊';
+       muteButton.classList.remove('muted');
+       muteButton.title = 'Mute';
 
-      isPickerVisible = false;
-    }
+       isPickerVisible = false;
+     });
+ }
 
-    // Function to play channel from side menu
+ // Function to play channel from side menu
     function playChannelFromMenu(url, name, index) {
       // Hide side menu when channel is selected
       if (isMenuVisible) {
@@ -955,43 +958,28 @@
           // Display channels based on filter
           displayChannels(channels);
           
-          // Auto-play first channel if available
+          // Auto-play first channel if supported, otherwise show menu
           if (channels.length > 0) {
             const firstChannel = channels[0];
-            setTimeout(() => {
+            // Skip iframe-based channels for auto-play
+            if (!firstChannel.url.includes('php?m3u8')) {
               // Hide side menu automatically
-              if (isMenuVisible) {
-                toggleSideMenu();
-              }
-                // Play the first channel
-              if (firstChannel.url.includes('php?m3u8')) {
-                const iframe = document.createElement('iframe');
-                iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
-                iframe.style.width = '100%';
-                iframe.style.height = '100%';
-                iframe.style.border = 'none';
-                iframe.allowfullscreen = true;
-                
-                document.getElementById('videoContainer').innerHTML = '';
-                document.getElementById('videoContainer').appendChild(iframe);
-                document.getElementById('videoContainer').style.display = 'block';
-                
-                // Hide channel picker and show back button
-                document.getElementById('channelPicker').style.display = 'none';
-                document.getElementById('backButton').style.display = 'block';
-                isPickerVisible = false;
-              } else {
-                playStream(firstChannel.url);
-              }
-              
-              // Mark first channel as active in the menu
-              setTimeout(() => {
-                const firstMenuItem = document.querySelector('[data-index="0"]');
-                if (firstMenuItem) {
-                  firstMenuItem.classList.add('active');
-                }
-              }, 100);
-            }, 500); // Small delay to ensure UI is ready
+              if (isMenuVisible) toggleSideMenu();
+              // Attempt to play via playStream, fallback to picker on failure
+              playStream(firstChannel.url)
+                .then(() => {
+                  // Mark first channel as active
+                  const firstMenuItem = document.querySelector('[data-index="0"]');
+                  if (firstMenuItem) firstMenuItem.classList.add('active');
+                })
+                .catch(err => {
+                  console.error('Auto-play failed:', err);
+                  showPicker();
+                });
+            } else {
+              // Cannot auto-play iframe streams; show picker
+              showPicker();
+            }
           }
         })
         .catch(error => {
