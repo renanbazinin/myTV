@@ -1,196 +1,624 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>RENAN TV</title>
+<head>  <title>RENAN TV</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="google-site-verification" content="jDk1s6N-IOBTrNM4PV6WqMvZVyTrDHe8nv0tHPHHvaQ" />
   <link rel="icon" href="https://i.imgur.com/opmOlZ5.png" type="image/x-icon">
-            
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+              <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --primary-bg: linear-gradient(135deg, #0f0f0f 0%, #1a1a2e 50%, #16213e 100%);
+      --secondary-bg: rgba(30, 30, 46, 0.95);
+      --accent-color: #6366f1;
+      --accent-hover: #4f46e5;
+      --text-primary: #ffffff;
+      --text-secondary: #a1a1aa;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --shadow-color: rgba(0, 0, 0, 0.3);
+      --glass-bg: rgba(255, 255, 255, 0.05);
+      --glass-border: rgba(255, 255, 255, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       padding: 0;
-      overflow: hidden;
-      background-color: #121212; /* Dark background color */
-      color: #fff; /* Light text color */
-    }
-
-    
-    #channelPicker {
-      
-      z-index: 3;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-wrap: wrap;
-      position: relative;
-    }
-
-    #supportButton {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--primary-bg);
+      background-attachment: fixed;
+      color: var(--text-primary);
+      overflow-x: hidden;
+      overflow-y: auto;
+      min-height: 100vh;
+    }    /* Header */
+    .header {
       position: fixed;
-      right: 10px;
-      z-index: 4; /* Ensure it appears above other elements */
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--glass-border);
+      padding: 0.5rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 45px;
+      margin: 0.25rem 0.5rem;
+      border-radius: 12px;
+      top: 0.25rem;
+      right: 0.5rem;
+      left: 0.5rem;
+      width: calc(100% - 1rem);
     }
-    
-    #videoContainer {
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }    .logo {
+      font-size: 1.2rem;
+      font-weight: 700;
+      background: linear-gradient(45deg, var(--accent-color), #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header-controls {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }    /* Main Layout */
+    .main-container {
+      display: flex;
+      margin-top: 55px;
+      min-height: calc(100vh - 55px);
+    }.side-menu {
+      position: fixed;
+      left: 0;
+      top: 55px;
+      width: 280px;
+      height: calc(100vh - 55px);
+      background: var(--glass-bg);
+      backdrop-filter: blur(15px);
+      border-right: 1px solid var(--glass-border);
+      padding: 1.5rem;
+      overflow-y: auto;
+      z-index: 50;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }    .side-menu.hidden {
+      transform: translateX(-100%);
+    }
+
+    /* Mobile side menu overlay */
+    @media screen and (max-width: 768px) {
+      .side-menu {
+        z-index: 150;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+      }
+      
+      .side-menu:not(.hidden) {
+        transform: translateX(0);
+      }
+    }
+
+    .content-area {
+      flex: 1;
+      margin-left: 280px;
+      transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .content-area.expanded {
+      margin-left: 0;
+    }
+
+    #channelPicker {
+      z-index: 3;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 1.5rem;
+      padding: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      position: relative;
+    }    #videoContainer {
       z-index: 1;
       position: fixed;
-      top: 10%;
+      top: 55px;
       left: 0;
       width: 100%;
-      height: calc(90% - 10px); /* Adjusted to fit within 90% of the screen */
-      overflow: hidden;
+      height: calc(100vh - 55px);
+      background: #000;
+      display: none;
     }
 
     .video-element {
       width: 100%;
       height: 100%;
-      object-fit: contain; /* Adjust the value as needed (contain, cover, etc.) */
+      object-fit: contain;
     }
 
-    img {
-      max-width: 100%; /* Adjust the percentage as needed */
-  max-height: 90%; /* Adjust the percentage as needed */
-  display: block; /* Centers the image */
-  margin: auto; /* Centers the image */
-    }
-
-    .channel-button-support{
-      border-radius: 10px;
-      margin: 5px;
-      padding: 5px;
-      cursor: pointer;
-      background-color: #424242; /* Darker button background color */
+    .channel-button img {
+      width: 100%;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 12px;
+      margin-bottom: 0.5rem;
+      transition: transform 0.3s ease;
+    }    .channel-button-support {
+      background: linear-gradient(135deg, var(--accent-color), #8b5cf6);
       border: none;
-      color: #fff; /* Light button text color */
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      color: white;
+      font-weight: 600;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+    }    .channel-button-support:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+      background: linear-gradient(135deg, var(--accent-hover), #7c3aed);
     }
 
     .channel-button {
-      border-radius: 5px;
-
-      display: inline-block;
-      margin: 5px;
-      padding: 5px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 1rem;
       cursor: pointer;
-      background-color: #424242; /* Darker button background color */
-      border: none;
-      color: #fff; /* Light button text color */
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      color: var(--text-primary);
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 500;
+      position: relative;
+      overflow: hidden;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
     }
 
-    /* Added CSS for adjusting channel button height */
-    
+    .channel-button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      transition: left 0.5s;
+    }
+
+    .channel-button:hover::before {
+      left: 100%;
+    }
+
+    .channel-button:hover {
+      transform: translateY(-4px);
+      background: var(--glass-bg);
+      border-color: var(--accent-color);
+      box-shadow: 0 8px 32px var(--shadow-color);
+    }
+
+    .channel-button:hover img {
+      transform: scale(1.05);
+    }    /* Mobile optimizations */
+    @media screen and (max-width: 768px) {
+      .header {
+        padding: 0.75rem 1rem;
+        height: 55px;
+        margin: 0.25rem;
+        width: calc(100% - 0.5rem);
+      }
+      
+      .header-left {
+        gap: 1rem;
+      }
+      
+      .logo {
+        font-size: 1.1rem;
+      }
+      
+      #backButton {
+        padding: 0.75rem 1.25rem;
+        font-size: 1rem;
+        font-weight: 600;
+        min-width: 120px;
+        border-radius: 16px;
+        background: var(--accent-color);
+        border-color: var(--accent-color);
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+      }
+      
+      #backButton:hover {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+        transform: scale(1.05);
+      }
+      
+      .channel-button-support {
+        padding: 0.6rem 1rem;
+        font-size: 0.85rem;
+      }
+      
+      .side-menu {
+        width: 100%;
+        transform: translateX(-100%);
+        top: 65px;
+        height: calc(100vh - 65px);
+      }
+      
+      .side-menu.visible {
+        transform: translateX(0);
+      }
+      
+      .content-area {
+        margin-left: 0;
+      }
+      
+      .main-container {
+        margin-top: 65px;
+        min-height: calc(100vh - 65px);
+      }
+      
+      #videoContainer {
+        top: 65px;
+        height: calc(100vh - 65px);
+      }
+      
+      #channelPicker {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 1rem;
+        padding: 1rem;
+      }
+      
+      .channel-button {
+        padding: 0.75rem;
+        min-height: 110px;
+        font-size: 0.8rem;
+      }
+      
+      .channel-button img {
+        height: 65px;
+      }
+    }    @media screen and (max-width: 480px) {
+      .header {
+        padding: 0.5rem 0.75rem;
+        height: 50px;
+        margin: 0.2rem;
+        width: calc(100% - 0.4rem);
+      }
+      
+      .logo {
+        font-size: 1rem;
+      }
+      
+      #backButton {
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+        min-width: 100px;
+      }
+      
+      .channel-button-support {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.75rem;
+      }
+      
+      .side-menu {
+        top: 60px;
+        height: calc(100vh - 60px);
+        padding: 1rem;
+      }
+      
+      .main-container {
+        margin-top: 60px;
+        min-height: calc(100vh - 60px);
+      }
+      
+      #videoContainer {
+        top: 60px;
+        height: calc(100vh - 60px);
+      }
+      
+      #channelPicker {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 0.75rem;
+        padding: 0.75rem;
+      }
+      
+      .channel-button {
+        padding: 0.5rem;
+        min-height: 95px;
+        font-size: 0.75rem;
+      }
+      
+      .channel-button img {
+        height: 55px;
+      }
+      
+      .channel-menu-item {
+        padding: 1rem 0.75rem;
+        font-size: 0.85rem;
+      }
+      
+      .channel-menu-item img {
+        width: 25px !important;
+        height: 25px !important;
+      }
+    }
+
     @media screen and (max-height: 600px) {
       .channel-button {
-        width: 100px; /* Adjust the width as needed */
-        height: 60px; /* Adjust the height as needed */
-        font-size: 12px; /* Adjust the font size as needed */
+        min-height: 80px;
+        font-size: 0.75rem;
+      }
+      
+      .channel-button img {
+        height: 50px;
+      }
+    }    /* Mobile touch improvements */
+    @media (hover: none) and (pointer: coarse) {
+      .channel-button {
+        min-height: 130px;
+        padding: 1rem;
+      }
+      
+      .channel-button img {
+        height: 75px;
+      }
+      
+      .channel-menu-item {
+        padding: 1rem;
+        min-height: 50px;
+        font-size: 1rem;
+      }
+      
+      #backButton {
+        padding: 1rem 1.5rem;
+        font-size: 1.1rem;
+        min-width: 140px;
+        min-height: 48px;
+      }
+      
+      .channel-button-support {
+        padding: 0.75rem 1.25rem;
+        font-size: 0.9rem;
+        min-height: 40px;
       }
     }
 
-    #backButton {
-      position: fixed;
-      top: 0;
-      right: 0;
-      padding: 10px;
-      cursor: pointer;
-      
-      color: #fff; /* Light back button text color */
-    }
-    #showUSChannels {
-      order: 9999;
-    }
-    
     @media screen and (orientation: portrait) and (min-height: 600px) and (min-width: 600px) {
-      .channel-button {
-        width: 120px; /* Adjust the width as needed */
-        height: 120px; /* Adjust the height as needed */
-       font-size: 16px;   /*Adjust the font size as needed */
+      #channelPicker {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
       }
-       #supportButton{
-        position: fixed;
-  
-        width: 120px;  
-        height: 120px; 
-
-        bottom: 1;
-     
       
+      .channel-button {
+        min-height: 140px;
+        font-size: 0.9rem;
       }
-      #toggleButton{
-        bottom: 8% !important;
-
-
+      
+      .channel-button img {
+        height: 90px;
+      }
+    }    @media screen and (orientation: landscape) and (min-width: 900px) {
+      #channelPicker {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      }
+      
+      .channel-button {
+        min-height: 110px;
+      }
+      
+      .channel-button img {
+        height: 70px;
       }
     }
 
-    @media screen and (orientation: landscape) and (min-width: calc(1.5 * 600px)) {
-      .channel-button {
-        width: 75px; /* Adjust the width as needed */
-        height: 75px; /* Adjust the height as needed */
-        font-size: 14px; /* Adjust the font size as needed */
+    /* Extra small mobile devices */
+    @media screen and (max-width: 375px) {
+      .header {
+        padding: 0.4rem 0.6rem;
+        height: 48px;
       }
       
-      #supportButton {
-        top: 10px;
+      .logo {
+        font-size: 0.9rem;
       }
+      
+      #backButton {
+        padding: 0.8rem 1.2rem;
+        font-size: 1rem;
+        font-weight: 700;
+        min-width: 110px;
+        background: var(--accent-color);
+        border: 2px solid var(--accent-color);
+        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+      }
+      
+      .channel-button-support {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.7rem;
+      }
+      
+      #channelPicker {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 0.5rem;
+        padding: 0.5rem;
+      }
+      
+      .channel-button {
+        padding: 0.4rem;
+        min-height: 85px;
+        font-size: 0.7rem;
+      }
+      
+      .channel-button img {
+        height: 45px;
+      }
+      
+      .channel-menu-item {
+        padding: 0.8rem 0.6rem;
+        font-size: 0.8rem;
+      }
+    }/* Control buttons */
+    #backButton {
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 0.5rem 1rem;
+      color: var(--text-primary);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: none;
+      font-size: 0.9rem;
     }
-        /* Added CSS for adjusting iframe size */
-        .iframe-container {
+
+    #backButton:hover {
+      background: var(--glass-bg);
+      border-color: var(--accent-color);
+      transform: translateY(-2px);
+    }/* Remove toggle button styles - using only side menu */
+
+    /* Special button styling */
+    #showUSChannels {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: white;
+      font-weight: 600;
+      border: none;
+      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+    }
+
+    #showUSChannels:hover {
+      background: linear-gradient(135deg, #d97706, #b45309);
+      box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
+    }
+
+    /* Loading animation */
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 200px;
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+    }
+
+    .loading::after {
+      content: '';
+      width: 20px;
+      height: 20px;
+      margin-left: 10px;
+      border: 2px solid var(--accent-color);
+      border-top: 2px solid transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Iframe container */
+    .iframe-container {
       position: relative;
       width: 100%;
       height: 100%;
-      padding-bottom: 56.25%; /* 16:9 aspect ratio */
+      background: #000;
     }
+    
     .iframe-container iframe {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
+      border: none;
     }
 
-
-    #toggleButton {
-      position: fixed;
-        bottom: 12%; 
-        right: 8px;
-        padding: 10px;
-        cursor: pointer;
-        background-color: #424242;
-        border: none;
-        color: #fff;
-        z-index: 5;
-        opacity: 0.56; 
-        border-radius: 10px;
-
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 8px;
     }
-    
-    #toggleButton:hover {
-      background-color: #616161; /* Darker button background color on hover */
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
     }
-    
-    #toggleButton.hidden {
-      display: none;
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--glass-bg);
+      border-radius: 4px;
+      border: 1px solid var(--glass-border);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-color);
     }
     
   </style>
   
 </head>
-<body>
-  <div id="channelPicker">
-    <a id="supportButton" href="https://www.buymeacoffee.com/renanbazinin" target="_blank">
-      <button class="channel-button-support">Support Me</button>
-    </a>
+<body>  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">RENAN TV</div>
+      <button id="backButton">← Back to Channels</button>
+    </div>
+    <div class="header-controls">      <a id="supportButton" href="https://www.buymeacoffee.com/renanbazinin" target="_blank">
+        <button class="channel-button-support">Support Me</button>
+      </a>
+    </div>
   </div>
 
-  <div id="videoContainer"></div>
-  <div id="backButton"></div>
-  <div id="toggleButton">Hide</div>
+  <!-- Main Container -->
+  <div class="main-container">
+    <!-- Side Menu -->
+    <div class="side-menu" id="sideMenu">
+      <div style="padding: 1rem 0; border-bottom: 1px solid var(--glass-border); margin-bottom: 1rem;">
+        <h3 style="margin: 0; color: var(--text-primary); font-size: 1.1rem; font-weight: 600;">Channel Categories</h3>
+      </div>
+      <!-- Menu items will be populated here -->
+    </div>
 
-  <script>
-    let isPickerVisible = true;
-    const toggleButton = document.getElementById('toggleButton');
-    let isFilterApplied = true;
+    <!-- Content Area -->
+    <div class="content-area" id="contentArea">
+      <!-- Channel Picker -->
+      <div id="channelPicker">
+        <div class="loading">Loading channels...</div>
+      </div>
+    </div>
+  </div>
+  <!-- Video Container -->
+  <div id="videoContainer"></div>
+  
+  <script>    let isPickerVisible = true;
+    let isMenuVisible = true;
+    const sideMenu = document.getElementById('sideMenu');
+    const contentArea = document.getElementById('contentArea');
+    let isFilterApplied = true;    function toggleSideMenu() {
+      if (isMenuVisible) {
+        sideMenu.classList.add('hidden');
+        contentArea.classList.add('expanded');
+        isMenuVisible = false;
+      } else {
+        sideMenu.classList.remove('hidden');
+        contentArea.classList.remove('expanded');
+        isMenuVisible = true;
+      }
+    }
 
     function playStreamRaw(url) {
       const videoElement = document.createElement('video');
@@ -231,97 +659,140 @@
 
       // Hide back button when playing video
       document.getElementById('backButton').style.display = 'none';
-}
-
-
-    function playStream(url) {
+}    function playStream(url) {
       const videoElement = document.createElement('video');
       videoElement.className = 'video-element';
       videoElement.controls = true;
       videoElement.autoplay = true;
+      videoElement.muted = true; // Enable muted autoplay for better browser compatibility
 
       // Check if HLS.js is supported
       if (Hls.isSupported()) {
         const hls = new Hls();
         hls.loadSource(url);
         hls.attachMedia(videoElement);
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+          videoElement.play().catch(e => console.log('Autoplay failed:', e));
+        });
       } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
         // If native HLS is supported
         videoElement.src = url;
+        videoElement.addEventListener('loadedmetadata', function() {
+          videoElement.play().catch(e => console.log('Autoplay failed:', e));
+        });
       } else {
         console.error('HLS is not supported');
       }
 
       document.getElementById('videoContainer').innerHTML = '';
       document.getElementById('videoContainer').appendChild(videoElement);
-
-      // Hide back button when playing video
-      document.getElementById('backButton').style.display = 'none';
+      document.getElementById('videoContainer').style.display = 'block';      // Hide channel picker and show back button
+      document.getElementById('channelPicker').style.display = 'none';
+      document.getElementById('backButton').style.display = 'block';
+      isPickerVisible = false;
     }
 
-    function createButton(name, logo, url, groupTitle) {
+    // Function to play channel from side menu
+    function playChannelFromMenu(url, name, index) {
+      // Hide side menu when channel is selected
+      if (isMenuVisible) {
+        toggleSideMenu();
+      }
+      
+      // Update active channel in menu
+      document.querySelectorAll('.channel-menu-item').forEach(item => item.classList.remove('active'));
+      document.querySelector(`[data-index="${index}"]`).classList.add('active');
+      
+      if (url.includes('php?m3u8')) {
+        const iframe = document.createElement('iframe');
+        iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        iframe.allowfullscreen = true;
+        
+        document.getElementById('videoContainer').innerHTML = '';
+        document.getElementById('videoContainer').appendChild(iframe);
+        document.getElementById('videoContainer').style.display = 'block';
+        
+        // Hide channel picker and show back button
+        document.getElementById('channelPicker').style.display = 'none';
+        document.getElementById('backButton').style.display = 'block';
+        isPickerVisible = false;
+      } else {
+        playStream(url);
+      }
+    }function createButton(name, logo, url, groupTitle) {
       console.log("groupTitle=" + groupTitle);
       console.log("isFilterApplied=" + isFilterApplied);
       
-      if (groupTitle != "Israel" && isFilterApplied) {
-        return;
-      }
-  
+      // Remove the filtering logic from createButton since it's now handled in displayChannels
       var button = document.createElement('button');
       button.className = 'channel-button';
-      button.innerHTML = '<img src="' + logo + '" alt="' + name + '" width="100" height="100">';
-      button.addEventListener('click', function() { 
+      
+      // Create image element
+      const img = document.createElement('img');
+      img.src = logo;
+      img.alt = name;
+      img.onerror = function() {
+        // Fallback if image fails to load
+        this.style.display = 'none';
+        button.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 80px; background: var(--glass-bg); border-radius: 12px; margin-bottom: 0.5rem; font-size: 2rem;">📺</div>' + name;
+      };
+      
+      button.appendChild(img);
+      
+      // Add channel name
+      const nameDiv = document.createElement('div');
+      nameDiv.textContent = name;
+      nameDiv.style.marginTop = '0.5rem';
+      nameDiv.style.fontSize = '0.85rem';
+      nameDiv.style.fontWeight = '500';
+      nameDiv.style.textAlign = 'center';
+      nameDiv.style.lineHeight = '1.2';
+      button.appendChild(nameDiv);
+        button.addEventListener('click', function() { 
+        // Hide side menu when channel is selected
+        if (isMenuVisible) {
+          toggleSideMenu();
+        }
         
         if (url.includes('php?m3u8') ) {
-        
           const iframe = document.createElement('iframe');
           iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
           iframe.style.width = '100%';
           iframe.style.height = '100%';
           iframe.style.border = 'none';
-          iframe.allowfullscreen = true;
-
-          document.getElementById('videoContainer').innerHTML = '';
+          iframe.allowfullscreen = true;          document.getElementById('videoContainer').innerHTML = '';
           document.getElementById('videoContainer').appendChild(iframe);
-            
-     /* 
-          //playStreamRaw(url)
-              
-          playStream('https://rotterxmltodata.onrender.com/m3u');
-         
-           playStreamRaw('https://rotterxmltodata.onrender.com/m3u')
-           ;*/
-             
+          document.getElementById('videoContainer').style.display = 'block';
+          
+          // Hide channel picker and show back button
+          document.getElementById('channelPicker').style.display = 'none';
+          document.getElementById('backButton').style.display = 'block';
+          isPickerVisible = false;
         } else {
           playStream(url);
         }
       });
+      
       return button;
-    }
-
-    function showPicker() {
-      document.getElementById('channelPicker').style.display = 'block';
-      // document.getElementById('videoContainer').style.height = 'calc(90% - 5px)'; /* Adjusted to fit within 90% of the screen */
+    }    function showPicker() {
+      document.getElementById('channelPicker').style.display = 'grid';
+      document.getElementById('videoContainer').style.display = 'none';
       document.getElementById('backButton').style.display = 'none';
-    }
-
-    document.getElementById('backButton').addEventListener('click', function() {
-      document.getElementById('channelPicker').style.display = 'block';
-      //  document.getElementById('videoContainer').style.height = 'calc(90% - 5px)'; /* Adjusted to fit within 90% of the screen */
-      document.getElementById('backButton').style.display = 'none';
-    });
-    function showPicker() {
-      channelPicker.style.display = 'flex'
-      backButton.style.display = 'none';
-      toggleButton.classList.remove('hidden');
-      toggleButton.innerHTML = "Hide"
-    }
-
-    function hidePicker() {
-      channelPicker.style.display = 'none';
-      backButton.style.display = 'none';
-      toggleButton.classList.remove('hidden');
-      toggleButton.innerHTML = "Show"
+      
+      // Show side menu when going back to channels
+      if (!isMenuVisible) {
+        sideMenu.classList.remove('hidden');
+        contentArea.classList.remove('expanded');
+        isMenuVisible = true;
+      }
+      
+      isPickerVisible = true;
+    }    function hidePicker() {
+      document.getElementById('channelPicker').style.display = 'none';
+      isPickerVisible = false;
     }
 
     function togglePicker() {
@@ -330,43 +801,24 @@
       } else {
         showPicker();
       }
-      isPickerVisible = !isPickerVisible;
-    }
-
-    toggleButton.addEventListener('click', togglePicker);
-    function start() {
+    }    // Event listeners
+    document.getElementById('backButton').addEventListener('click', function() {
+      // Back button now just toggles the side menu like Hide Menu button
+      toggleSideMenu();
+    });function start() {
+      const channelPicker = document.getElementById('channelPicker');
+      const sideMenu = document.getElementById('sideMenu');
+      channelPicker.innerHTML = '<div class="loading">Loading channels...</div>';
+      
       fetch('https://raw.githubusercontent.com/renanbazinin/myM3U/main/directLiveNamesDiffandEPG1.m3u')
         .then(response => response.text())
         .then(data => {
-          const channelPicker = document.getElementById('channelPicker');
           channelPicker.innerHTML = '';
 
-          const supportButton = document.createElement('a');
-          supportButton.id = 'supportButton';
-          supportButton.href = 'https://www.buymeacoffee.com/renanbazinin';
-          supportButton.target = '_blank';
-          const supportButtonInner = document.createElement('button');
-          supportButtonInner.className = 'channel-button-support';
-          supportButtonInner.textContent = 'Support Me';
-          supportButton.appendChild(supportButtonInner);
-          document.body.appendChild(supportButton);
-
-          if (isFilterApplied) {
-            const showUSChannelsButton = document.createElement('button');
-            showUSChannelsButton.id = 'showUSChannels';
-            showUSChannelsButton.className = 'channel-button';
-          
-            showUSChannelsButton.innerHTML = '<img src="https://i.imgur.com/lUKWqOA.png" style="height:40px"></img><br/>show US';
-         
-            channelPicker.appendChild(showUSChannelsButton);
-            document.getElementById('showUSChannels').addEventListener('click', function() {
-              isFilterApplied = false;
-              start();
-            });
-          }
-
+          // Parse channels and collect categories
           const lines = data.split(/\r?\n/);
           const channels = [];
+          const categories = new Set();
           let currentChannel = {};
 
           lines.forEach(line => {
@@ -381,60 +833,161 @@
               if (nameMatch && logoMatch) {
                 currentChannel.name = nameMatch[1];
                 currentChannel.logo = logoMatch[1];
-                currentChannel.groupTitle = groupTitleMatch[1];
+                currentChannel.groupTitle = groupTitleMatch ? groupTitleMatch[1] : 'Other';
+                categories.add(currentChannel.groupTitle);
               }
             } else if (line.trim() !== '' && !line.startsWith('#')) {
               currentChannel.url = line;
             }
           });
           
-
-          channels.forEach(channel => {
-            const button = createButton(channel.name, channel.logo, channel.url, channel.groupTitle);
-            channelPicker.appendChild(button);
-          });
-         
+          // Add remaining channel if exists
+          if (currentChannel.name && currentChannel.logo && currentChannel.url) {
+            channels.push(currentChannel);
+            categories.add(currentChannel.groupTitle);
+          }          // Populate side menu with channels directly
+          const channelMenuContent = channels.map((channel, index) => 
+            `<div class="channel-menu-item" onclick="playChannelFromMenu('${channel.url}', '${channel.name}', ${index})" data-index="${index}">
+              <img src="${channel.logo}" alt="${channel.name}" onerror="this.style.display='none'" style="width: 30px; height: 30px; border-radius: 6px; margin-right: 10px; object-fit: cover;">
+              <span>${channel.name}</span>
+            </div>`
+          ).join('');
           
+          sideMenu.innerHTML = `
+            <div style="padding: 1rem 0; border-bottom: 1px solid var(--glass-border); margin-bottom: 1rem;">
+              <h3 style="margin: 0; color: var(--text-primary); font-size: 1.1rem; font-weight: 600;">Channels</h3>
+            </div>
+            ${channelMenuContent}
+            <style>
+              .channel-menu-item {
+                display: flex;
+                align-items: center;
+                padding: 0.75rem 1rem;
+                margin: 0.25rem 0;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                color: var(--text-secondary);
+                font-weight: 500;
+                border: 1px solid transparent;
+                font-size: 0.9rem;
+              }
+              .channel-menu-item:hover, .channel-menu-item.active {
+                background: var(--glass-bg);
+                border-color: var(--accent-color);
+                color: var(--text-primary);
+                transform: translateX(4px);
+              }
+              .channel-menu-item span {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              }
+            </style>
+          `;// Store channels globally for filtering
+          window.allChannels = channels;
+          
+          // Display channels based on filter
+          displayChannels(channels);
+          
+          // Auto-play first channel if available
+          if (channels.length > 0) {
+            const firstChannel = channels[0];
+            setTimeout(() => {
+              // Hide side menu automatically
+              if (isMenuVisible) {
+                toggleSideMenu();
+              }
+                // Play the first channel
+              if (firstChannel.url.includes('php?m3u8')) {
+                const iframe = document.createElement('iframe');
+                iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
+                iframe.style.width = '100%';
+                iframe.style.height = '100%';
+                iframe.style.border = 'none';
+                iframe.allowfullscreen = true;
+                
+                document.getElementById('videoContainer').innerHTML = '';
+                document.getElementById('videoContainer').appendChild(iframe);
+                document.getElementById('videoContainer').style.display = 'block';
+                
+                // Hide channel picker and show back button
+                document.getElementById('channelPicker').style.display = 'none';
+                document.getElementById('backButton').style.display = 'block';
+                isPickerVisible = false;
+              } else {
+                playStream(firstChannel.url);
+              }
+              
+              // Mark first channel as active in the menu
+              setTimeout(() => {
+                const firstMenuItem = document.querySelector('[data-index="0"]');
+                if (firstMenuItem) {
+                  firstMenuItem.classList.add('active');
+                }
+              }, 100);
+            }, 500); // Small delay to ensure UI is ready
+          }
+        })
+        .catch(error => {
+          console.error('Error loading channels:', error);
+          channelPicker.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 2rem;">Failed to load channels. Please try again.</div>';
         });
-        
-        
     }
 
-    window.onload = function() {
+    function displayChannels(channelsToShow) {
+      const channelPicker = document.getElementById('channelPicker');
+      channelPicker.innerHTML = '';
+
+      if (isFilterApplied && channelsToShow === window.allChannels) {
+        // Show only Israel channels initially
+        channelsToShow = window.allChannels.filter(channel => channel.groupTitle === 'Israel');
+        
+        // Add "Show US Channels" button
+        const showUSChannelsButton = document.createElement('button');
+        showUSChannelsButton.id = 'showUSChannels';
+        showUSChannelsButton.className = 'channel-button';
+        
+        const flagImg = document.createElement('img');
+        flagImg.src = 'https://i.imgur.com/lUKWqOA.png';
+        flagImg.style.height = '40px';
+        flagImg.style.marginBottom = '0.5rem';
+        
+        const textDiv = document.createElement('div');
+        textDiv.textContent = 'Show US Channels';
+        textDiv.style.fontSize = '0.85rem';
+        textDiv.style.fontWeight = '600';
+        
+        showUSChannelsButton.appendChild(flagImg);
+        showUSChannelsButton.appendChild(textDiv);
+        channelPicker.appendChild(showUSChannelsButton);
+        
+        showUSChannelsButton.addEventListener('click', function() {
+          isFilterApplied = false;
+          displayChannels(window.allChannels);
+        });
+      }
+
+      channelsToShow.forEach(channel => {
+        const button = createButton(channel.name, channel.logo, channel.url, channel.groupTitle);
+        if (button) {
+          channelPicker.appendChild(button);
+        }
+      });
+    }    window.onload = function() {
       start();
     };
-    let timeout = null;
 
-
-    function showButton() {
-    clearTimeout(timeout);
-      toggleButton.style.opacity = '0.56';
-      timeout = setTimeout(function () {
-        toggleButton.style.opacity = '0';
-      }, 3500); // 
-    }
-    window.addEventListener('mousemove', showButton);
-window.addEventListener('touchmove', showButton);
-
-/*
-let deferredPrompt;
-
-window.addEventListener('beforeinstallprompt', (e) => {
-    deferredPrompt = e;
-});
-
-const installApp = document.getElementById('installApp');
-
-installApp.addEventListener('click', async () => {
-    if (deferredPrompt !== null) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-            deferredPrompt = null;
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        if (!isPickerVisible) {
+          showPicker();
         }
-    }
-});
-*/
+      } else if (e.key === 'h' || e.key === 'H') {
+        togglePicker();
+      }
+    });
   </script>
 </body>
 </html>
