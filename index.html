@@ -788,7 +788,14 @@
         document.getElementById('backButton').style.display = 'block';
         isPickerVisible = false;
       } else {
-        playStream(url);
+        if (name === '13-kanal-il') {
+          playVideoAndAudio(
+            'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
+            'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000'
+          );
+        } else {
+          playStream(url);
+        }
       }
     }function createButton(name, logo, url, groupTitle) {
       console.log("groupTitle=" + groupTitle);
@@ -840,7 +847,14 @@
           document.getElementById('backButton').style.display = 'block';
           isPickerVisible = false;
         } else {
-          playStream(url);
+          if (name === '13-kanal-il') {
+            playVideoAndAudio(
+              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
+              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000'
+            );
+          } else {
+            playStream(url);
+          }
         }
       });
       
@@ -1041,6 +1055,69 @@
         togglePicker();
       }
     });
+
+    // New function to play separate video and audio streams for specific channel
+function playVideoAndAudio(videoUrl, audioUrl) {
+  return new Promise((resolve, reject) => {
+    const videoElement = document.createElement('video');
+    videoElement.className = 'video-element';
+    videoElement.controls = true;
+    videoElement.autoplay = true;
+    videoElement.muted = false;
+    isMuted = false;
+    const audioElement = document.createElement('video');
+    audioElement.style.display = 'none';
+    audioElement.autoplay = true;
+    audioElement.muted = false;
+    // Store video element reference
+    currentVideoElement = videoElement;
+    const container = document.getElementById('videoContainer');
+    // Use HLS.js for both streams
+    if (Hls.isSupported()) {
+      const hlsVideo = new Hls();
+      hlsVideo.loadSource(videoUrl);
+      hlsVideo.attachMedia(videoElement);
+      const hlsAudio = new Hls();
+      hlsAudio.loadSource(audioUrl);
+      hlsAudio.attachMedia(audioElement);
+      hlsVideo.on(Hls.Events.MANIFEST_PARSED, () => {
+        container.innerHTML = '';
+        container.appendChild(videoElement);
+        container.appendChild(audioElement);
+        container.style.display = 'block';
+        document.getElementById('channelPicker').style.display = 'none';
+        document.getElementById('backButton').style.display = 'block';
+        updateMuteButtonVisibility(false);
+        const muteButton = document.getElementById('muteButton');
+        muteButton.textContent = '🔊';
+        muteButton.classList.remove('muted');
+        muteButton.title = 'Mute';
+        videoElement.play()
+          .then(() => audioElement.play().then(resolve).catch(reject))
+          .catch(reject);
+      });
+    } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+      videoElement.src = videoUrl;
+      audioElement.src = audioUrl;
+      videoElement.addEventListener('loadedmetadata', () => {
+        container.innerHTML = '';
+        container.appendChild(videoElement);
+        container.appendChild(audioElement);
+        container.style.display = 'block';
+        document.getElementById('channelPicker').style.display = 'none';
+        document.getElementById('backButton').style.display = 'block';
+        updateMuteButtonVisibility(false);
+        const muteButton = document.getElementById('muteButton');
+        muteButton.textContent = '🔊';
+        muteButton.classList.remove('muted');
+        muteButton.title = 'Mute';
+        Promise.all([videoElement.play(), audioElement.play()]).then(resolve).catch(reject);
+      });
+    } else {
+      reject(new Error('HLS is not supported'));
+    }
+  });
+}
   </script>
 </body>
 </html>
