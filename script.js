@@ -4,6 +4,12 @@ let isPickerVisible = true;
     const contentArea = document.getElementById('contentArea');    let isFilterApplied = true;    let currentVideoElement = null;
     let isMuted = true; // Start muted for autoplay compatibility
 
+    // For two-digit channel input
+    let channelInput = [];
+    let channelInputTimer = null;
+    const channelInputDisplay = document.getElementById('channel-input-display');
+    const channelInputSpans = channelInputDisplay ? channelInputDisplay.querySelectorAll('span') : [];
+
     function toggleSideMenu() {
       if (isMenuVisible) {
         sideMenu.classList.add('hidden');
@@ -378,16 +384,68 @@ let isPickerVisible = true;
         }
       } else if (e.key === 'h' || e.key === 'H') {
         togglePicker();
-      } else if (e.key >= '1' && e.key <= '9') {
-        const channelIndex = parseInt(e.key) - 1;
-        if (window.allChannels && window.allChannels[channelIndex]) {
-          const channel = window.allChannels[channelIndex];
-          playChannelFromMenu(channel.url, channel.name, channelIndex);
-        }
+      } else if (e.key >= '0' && e.key <= '9') {
+        handleNumericInput(e.key);
       }
     });
 
-    // New function to play separate video and audio streams for specific channel
+    // New functions for two-digit channel input
+    function handleNumericInput(digit) {
+    if (!channelInputDisplay) return;
+
+    if (channelInputTimer) {
+        clearTimeout(channelInputTimer);
+    }
+
+    channelInput.push(digit);
+    updateChannelInputDisplay();
+
+    if (channelInput.length === 1) {
+        channelInputTimer = setTimeout(() => {
+            const channelNumber = parseInt(channelInput[0]);
+            if (channelNumber > 0) {
+                const channelIndex = channelNumber - 1;
+                if (window.allChannels && window.allChannels[channelIndex]) {
+                    const channel = window.allChannels[channelIndex];
+                    playChannelFromMenu(channel.url, channel.name, channelIndex);
+                }
+            }
+            resetChannelInput();
+        }, 1500); // 1.5-second wait
+    } else if (channelInput.length === 2) {
+        const channelNumber = parseInt(channelInput.join(''));
+        const channelIndex = channelNumber - 1;
+
+        if (window.allChannels && window.allChannels[channelIndex]) {
+            const channel = window.allChannels[channelIndex];
+            playChannelFromMenu(channel.url, channel.name, channelIndex);
+        }
+        setTimeout(resetChannelInput, 500);
+    }
+}
+
+function updateChannelInputDisplay() {
+    if (!channelInputDisplay) return;
+    channelInputDisplay.classList.remove('hidden');
+    channelInputSpans[0].textContent = channelInput[0] || '_';
+    channelInputSpans[1].textContent = channelInput[1] || '_';
+}
+
+function resetChannelInput() {
+    if (!channelInputDisplay) return;
+    channelInput = [];
+    channelInputDisplay.classList.add('hidden');
+    if (channelInputSpans.length > 1) {
+        channelInputSpans[0].textContent = '_';
+        channelInputSpans[1].textContent = '_';
+    }
+    if (channelInputTimer) {
+        clearTimeout(channelInputTimer);
+        channelInputTimer = null;
+    }
+}
+
+// New function to play separate video and audio streams for specific channel
 function playVideoAndAudio(videoUrl, audioUrl) {
   return new Promise((resolve, reject) => {
     const videoElement = document.createElement('video');

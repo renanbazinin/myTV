@@ -1,5 +1,4 @@
-
-    :root {
+:root {
       --primary-bg: linear-gradient(135deg, #0f0f0f 0%, #1a1a2e 50%, #16213e 100%);
       --secondary-bg: rgba(30, 30, 46, 0.95);
       --accent-color: #6366f1;
@@ -652,3 +651,24 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+
+    #channel-input-display {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 2em;
+    z-index: 1001;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+#channel-input-display.hidden {
+    display: none;
+}
+
+#channel-input-display span {
+    margin: 0 5px;
+}
