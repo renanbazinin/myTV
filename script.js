@@ -58,7 +58,12 @@ let isPickerVisible = true;
 
        // Check if HLS.js is supported
        if (Hls.isSupported()) {
-         const hls = new Hls();
+         const hls = new Hls({
+           maxBufferLength: 120,
+           maxMaxBufferLength: 120,
+           liveMaxLatencyDuration: 120,
+           liveSyncDuration: 10
+         });
          hls.loadSource(url);
          hls.attachMedia(videoElement);
          hls.on(Hls.Events.MANIFEST_PARSED, function () {
@@ -463,10 +468,20 @@ function playVideoAndAudio(videoUrl, audioUrl) {
     const container = document.getElementById('videoContainer');
     // Use HLS.js for both streams
     if (Hls.isSupported()) {
-      const hlsVideo = new Hls();
+      const hlsVideo = new Hls({
+        maxBufferLength: 120,
+        maxMaxBufferLength: 120,
+        liveMaxLatencyDuration: 120,
+        liveSyncDuration: 10
+      });
       hlsVideo.loadSource(videoUrl);
       hlsVideo.attachMedia(videoElement);
-      const hlsAudio = new Hls();
+      const hlsAudio = new Hls({
+        maxBufferLength: 120,
+        maxMaxBufferLength: 120,
+        liveMaxLatencyDuration: 120,
+        liveSyncDuration: 10
+      });
       hlsAudio.loadSource(audioUrl);
       hlsAudio.attachMedia(audioElement);
       hlsVideo.on(Hls.Events.MANIFEST_PARSED, () => {
