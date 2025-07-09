@@ -119,7 +119,7 @@ let isPickerVisible = true;
         document.getElementById('backButton').style.display = 'block';
         isPickerVisible = false;
       } else {
-        if (name === '13-kanal-il') {
+        if (name === '13-kanal-il1') {
           playVideoAndAudio(
             'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
             'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000'
