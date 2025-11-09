@@ -7,6 +7,119 @@ let isPickerVisible = true;
     let audioVideoSyncInterval = null;
     let currentHlsVideoInstance = null;
     let currentHlsAudioInstance = null;
+    let loadingStatusElement = null;
+
+    function showLoadingMessage(message = 'Loading buffer...') {
+      const container = document.getElementById('videoContainer');
+      if (!container) return;
+
+      if (!loadingStatusElement) {
+        loadingStatusElement = document.createElement('div');
+        loadingStatusElement.className = 'loading-status-overlay';
+        loadingStatusElement.style.position = 'absolute';
+        loadingStatusElement.style.top = '50%';
+        loadingStatusElement.style.left = '50%';
+        loadingStatusElement.style.transform = 'translate(-50%, -50%)';
+        loadingStatusElement.style.padding = '0.85rem 1.5rem';
+        loadingStatusElement.style.borderRadius = '999px';
+        loadingStatusElement.style.background = 'rgba(15, 15, 15, 0.75)';
+        loadingStatusElement.style.color = '#fff';
+        loadingStatusElement.style.fontSize = '1rem';
+        loadingStatusElement.style.fontWeight = '600';
+        loadingStatusElement.style.letterSpacing = '0.02em';
+        loadingStatusElement.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.35)';
+        loadingStatusElement.style.zIndex = '10';
+        loadingStatusElement.style.display = 'none';
+        loadingStatusElement.style.alignItems = 'center';
+        loadingStatusElement.style.justifyContent = 'center';
+        loadingStatusElement.style.gap = '0.65rem';
+        loadingStatusElement.style.pointerEvents = 'none';
+
+        const spinner = document.createElement('span');
+        spinner.className = 'loading-spinner';
+        spinner.style.width = '1rem';
+        spinner.style.height = '1rem';
+        spinner.style.border = '2px solid rgba(255, 255, 255, 0.2)';
+        spinner.style.borderTopColor = '#fff';
+        spinner.style.borderRadius = '50%';
+        spinner.style.animation = 'loading-spin 1s linear infinite';
+
+        const textNode = document.createElement('span');
+        textNode.className = 'loading-text';
+
+        loadingStatusElement.appendChild(spinner);
+        loadingStatusElement.appendChild(textNode);
+      }
+
+      const textElement = loadingStatusElement.querySelector('.loading-text');
+      if (textElement) {
+        textElement.textContent = message;
+      } else {
+        loadingStatusElement.textContent = message;
+      }
+
+      if (loadingStatusElement.parentElement !== container) {
+        container.appendChild(loadingStatusElement);
+      }
+
+      loadingStatusElement.style.display = 'flex';
+    }
+
+    function hideLoadingMessage() {
+      if (loadingStatusElement) {
+        loadingStatusElement.style.display = 'none';
+      }
+    }
+
+    // Inject keyframes for spinner if not already present
+    (function ensureLoadingSpinnerStyles() {
+      const existing = document.getElementById('loading-spinner-styles');
+      if (existing) return;
+
+      const style = document.createElement('style');
+      style.id = 'loading-spinner-styles';
+      style.textContent = `
+        @keyframes loading-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(style);
+    })();
+
+    function normalizePlaybackOptions(options) {
+      const defaults = {
+        headers: null,
+        initialLiveBufferSeconds: 0,
+        postReadyDelayMs: 0,
+        loadingMessage: null
+      };
+
+      if (!options) {
+        return defaults;
+      }
+
+      if (typeof options !== 'object' || Array.isArray(options)) {
+        return defaults;
+      }
+
+      const recognizedKeys = ['headers', 'initialLiveBufferSeconds', 'postReadyDelayMs', 'loadingMessage'];
+      const hasRecognizedKey = recognizedKeys.some(key => Object.prototype.hasOwnProperty.call(options, key));
+
+      if (hasRecognizedKey) {
+        return {
+          headers: options.headers || null,
+          initialLiveBufferSeconds: typeof options.initialLiveBufferSeconds === 'number' ? options.initialLiveBufferSeconds : 0,
+          postReadyDelayMs: typeof options.postReadyDelayMs === 'number' ? options.postReadyDelayMs : 0,
+          loadingMessage: typeof options.loadingMessage === 'string' ? options.loadingMessage : null
+        };
+      }
+
+      return {
+        ...defaults,
+        headers: options
+      };
+    }
 
     function clearAudioVideoSyncInterval() {
       if (audioVideoSyncInterval) {
@@ -68,6 +181,7 @@ let isPickerVisible = true;
     }
 
     function cleanupAllMedia() {
+      hideLoadingMessage();
       clearAudioVideoSyncInterval();
       
       // Destroy HLS instances
@@ -159,6 +273,11 @@ let isPickerVisible = true;
        currentVideoElement = videoElement;
        currentAudioElement = null;
 
+       const container = document.getElementById('videoContainer');
+       const channelPickerElement = document.getElementById('channelPicker');
+       const backButton = document.getElementById('backButton');
+       const muteButton = document.getElementById('muteButton');
+
        // Check if HLS.js is supported
        if (Hls.isSupported()) {
          // If headers are provided, configure Hls.js XHR setup so requests include them
@@ -181,7 +300,15 @@ let isPickerVisible = true;
          hls.loadSource(url);
          hls.attachMedia(videoElement);
          hls.on(Hls.Events.MANIFEST_PARSED, function () {
-          videoElement.play().then(resolve).catch(reject);
+          videoElement.play()
+            .then(() => {
+              hideLoadingMessage();
+              resolve();
+            })
+            .catch(error => {
+              hideLoadingMessage();
+              reject(error);
+            });
         });
          hls.on(Hls.Events.ERROR, function (event, data) {
           if (data.fatal) {
@@ -191,6 +318,7 @@ let isPickerVisible = true;
             if (currentHlsVideoInstance === hls) {
               currentHlsVideoInstance = null;
             }
+            hideLoadingMessage();
             reject(new Error('HLS playback error: ' + (data.details || 'unknown')));
           }
         });
@@ -202,25 +330,42 @@ let isPickerVisible = true;
          // If native HLS is supported
          videoElement.src = url;
         videoElement.addEventListener('loadedmetadata', function() {
-          videoElement.play().then(resolve).catch(reject);
+          videoElement.play()
+            .then(() => {
+              hideLoadingMessage();
+              resolve();
+            })
+            .catch(error => {
+              hideLoadingMessage();
+              reject(error);
+            });
         });
        } else {
+        hideLoadingMessage();
         reject(new Error('HLS is not supported'));
        }
 
-       document.getElementById('videoContainer').innerHTML = '';
-       document.getElementById('videoContainer').appendChild(videoElement);
-       document.getElementById('videoContainer').style.display = 'block';
-       document.getElementById('channelPicker').style.display = 'none';
-       document.getElementById('backButton').style.display = 'block';
+       if (container) {
+         container.innerHTML = '';
+         container.appendChild(videoElement);
+         container.style.display = 'block';
+       }
+       if (channelPickerElement) {
+         channelPickerElement.style.display = 'none';
+       }
+       if (backButton) {
+         backButton.style.display = 'block';
+       }
 
        // Show mute button and update its state to unmuted
        updateMuteButtonVisibility(false);
-       const muteButton = document.getElementById('muteButton');
-       muteButton.textContent = '🔊';
-       muteButton.classList.remove('muted');
-       muteButton.title = 'Mute';
+       if (muteButton) {
+         muteButton.textContent = '🔊';
+         muteButton.classList.remove('muted');
+         muteButton.title = 'Mute';
+       }
 
+       showLoadingMessage();
        isPickerVisible = false;
      });
  }
@@ -262,17 +407,32 @@ let isPickerVisible = true;
             playVideoAndAudio(
               'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/keshet_12_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
               'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/keshet_12_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000',
-              vlcHeaders
+              {
+                headers: vlcHeaders,
+                initialLiveBufferSeconds: 8,
+                postReadyDelayMs: 2000,
+                loadingMessage: 'Buffering Keshet 12 (~5s)...'
+              }
             );
           } else if (name === '13-kanal-il1') {
             playVideoAndAudio(
               'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
-              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000'
+              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000',
+              {
+                initialLiveBufferSeconds: 8,
+                postReadyDelayMs: 2000,
+                loadingMessage: 'Buffering Reshet 13 (~5s)...'
+              }
             );
           } else if (name === '13-kanal-il') {
           playVideoAndAudio(
             'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
-            'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000'
+            'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000',
+            {
+              initialLiveBufferSeconds: 5,
+              postReadyDelayMs: 2000,
+              loadingMessage: 'Buffering Reshet 13 (~5s)...'
+            }
           );
         } else {
           playStream(url);
@@ -338,17 +498,32 @@ let isPickerVisible = true;
             playVideoAndAudio(
               'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/keshet_12_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
               'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/keshet_12_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000',
-              vlcHeaders
+              {
+                headers: vlcHeaders,
+                initialLiveBufferSeconds: 5,
+                postReadyDelayMs: 2000,
+                loadingMessage: 'Buffering Keshet 12 (~5s)...'
+              }
             );
           } else if (name === '13-kanal-il') {
             playVideoAndAudio(
               'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
-              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000'
+              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000',
+              {
+                initialLiveBufferSeconds: 5,
+                postReadyDelayMs: 2000,
+                loadingMessage: 'Buffering Reshet 13 (~5s)...'
+              }
             );
           } else if (name === '13-kanal-il1') {
             playVideoAndAudio(
               'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
-              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000'
+              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000',
+              {
+                initialLiveBufferSeconds: 5,
+                postReadyDelayMs: 2000,
+                loadingMessage: 'Buffering Reshet 13 (~5s)...'
+              }
             );
           } else {
             playStream(url);
@@ -358,6 +533,7 @@ let isPickerVisible = true;
       
       return button;
     }    function showPicker() {
+      hideLoadingMessage();
       document.getElementById('channelPicker').style.display = 'grid';
       document.getElementById('videoContainer').style.display = 'none';
       document.getElementById('backButton').style.display = 'none';
@@ -613,10 +789,19 @@ function resetChannelInput() {
 }
 
 // New function to play separate video and audio streams for specific channel
-function playVideoAndAudio(videoUrl, audioUrl, headers = null) {
+function playVideoAndAudio(videoUrl, audioUrl, options = null) {
   cleanupAllMedia();
 
   return new Promise((resolve, reject) => {
+    const {
+      headers: normalizedHeaders,
+      initialLiveBufferSeconds,
+      postReadyDelayMs,
+      loadingMessage
+    } = normalizePlaybackOptions(options);
+    const bufferSeconds = Math.max(initialLiveBufferSeconds || 0, 0);
+    const loadingMessageText = loadingMessage || (bufferSeconds >= 1 ? `Buffering stream (~${Math.round(bufferSeconds)}s)...` : 'Loading buffer...');
+
     const videoElement = document.createElement('video');
     videoElement.className = 'video-element';
     videoElement.controls = true;
@@ -653,6 +838,7 @@ function playVideoAndAudio(videoUrl, audioUrl, headers = null) {
       if (settled) return;
       settled = true;
 
+      hideLoadingMessage();
       clearAudioVideoSyncInterval();
 
       if (hlsVideo) {
@@ -773,10 +959,11 @@ function playVideoAndAudio(videoUrl, audioUrl, headers = null) {
       let target = null;
       const videoEnd = getSeekableEnd(videoElement);
       const audioEnd = getSeekableEnd(audioElement);
+      const preferredOffset = bufferSeconds > 0 ? bufferSeconds : 1;
 
       if (videoEnd !== null && audioEnd !== null) {
-        target = Math.min(videoEnd, audioEnd) - 1;
-        if (!Number.isFinite(target) || target <= 0) {
+        target = Math.min(videoEnd, audioEnd) - preferredOffset;
+        if (!Number.isFinite(target) || target <= 0.1) {
           target = null;
         }
       }
@@ -784,13 +971,17 @@ function playVideoAndAudio(videoUrl, audioUrl, headers = null) {
       if (target === null) {
         const fallback = Math.max(videoElement.currentTime || 0, audioElement.currentTime || 0);
         if (fallback > 0) {
-          target = fallback;
+          const fallbackTarget = fallback - bufferSeconds;
+          if (Number.isFinite(fallbackTarget) && fallbackTarget > 0.1) {
+            target = fallbackTarget;
+          }
         }
       }
 
-      if (target !== null && target > 0) {
-        try { videoElement.currentTime = target; } catch (_error) {}
-        try { audioElement.currentTime = target; } catch (_error) {}
+      if (target !== null) {
+        const clampedTarget = Math.max(target, 0);
+        try { videoElement.currentTime = clampedTarget; } catch (_error) {}
+        try { audioElement.currentTime = clampedTarget; } catch (_error) {}
       }
     };
 
@@ -824,6 +1015,7 @@ function playVideoAndAudio(videoUrl, audioUrl, headers = null) {
 
       updateMuteButtonVisibility(false);
       updateMuteButton();
+      showLoadingMessage(loadingMessageText);
     };
 
     const startSyncMonitor = () => {
@@ -866,10 +1058,14 @@ function playVideoAndAudio(videoUrl, audioUrl, headers = null) {
         await waitForMediaReady(audioElement);
         await Promise.all([waitForSeekable(videoElement), waitForSeekable(audioElement)]);
         alignInitialPosition();
+        if (postReadyDelayMs > 0) {
+          await new Promise(resolveDelay => setTimeout(resolveDelay, postReadyDelayMs));
+        }
         await videoElement.play();
         await audioElement.play();
 
         startSyncMonitor();
+        hideLoadingMessage();
 
         if (!settled) {
           settled = true;
@@ -890,12 +1086,12 @@ function playVideoAndAudio(videoUrl, audioUrl, headers = null) {
       };
 
       // Add headers support if provided
-      if (headers && typeof headers === 'object') {
+      if (normalizedHeaders && typeof normalizedHeaders === 'object') {
         hlsConfig.xhrSetup = function (xhr, url) {
           try {
-            for (const key in headers) {
-              if (Object.prototype.hasOwnProperty.call(headers, key)) {
-                xhr.setRequestHeader(key, headers[key]);
+            for (const key in normalizedHeaders) {
+              if (Object.prototype.hasOwnProperty.call(normalizedHeaders, key)) {
+                xhr.setRequestHeader(key, normalizedHeaders[key]);
               }
             }
           } catch (e) {
@@ -937,6 +1133,9 @@ function playVideoAndAudio(videoUrl, audioUrl, headers = null) {
         .then(() => beginPlayback())
         .catch(finalizeReject);
     } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+      if (normalizedHeaders) {
+        console.warn('Custom headers were requested but cannot be applied for native HLS playback in this browser. Proceeding without headers.');
+      }
       videoElement.src = videoUrl;
       audioElement.src = audioUrl;
 
