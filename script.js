@@ -5,6 +5,8 @@ let isPickerVisible = true;
     let isMuted = true; // Start muted for autoplay compatibility
     let currentAudioElement = null;
     let audioVideoSyncInterval = null;
+    let currentHlsVideoInstance = null;
+    let currentHlsAudioInstance = null;
 
     function clearAudioVideoSyncInterval() {
       if (audioVideoSyncInterval) {
@@ -42,6 +44,55 @@ let isPickerVisible = true;
       currentAudioElement = null;
     }
 
+    function stopCurrentVideoElement() {
+      if (!currentVideoElement) return;
+
+      try {
+        currentVideoElement.pause();
+      } catch (error) {
+        console.warn('Failed to pause video element:', error);
+      }
+
+      try {
+        currentVideoElement.removeAttribute('src');
+        currentVideoElement.load();
+      } catch (error) {
+        console.warn('Failed to reset video element:', error);
+      }
+
+      if (currentVideoElement.parentElement) {
+        currentVideoElement.parentElement.removeChild(currentVideoElement);
+      }
+
+      currentVideoElement = null;
+    }
+
+    function cleanupAllMedia() {
+      clearAudioVideoSyncInterval();
+      
+      // Destroy HLS instances
+      if (currentHlsVideoInstance) {
+        try {
+          currentHlsVideoInstance.destroy();
+        } catch (error) {
+          console.warn('Failed to destroy HLS video instance:', error);
+        }
+        currentHlsVideoInstance = null;
+      }
+      
+      if (currentHlsAudioInstance) {
+        try {
+          currentHlsAudioInstance.destroy();
+        } catch (error) {
+          console.warn('Failed to destroy HLS audio instance:', error);
+        }
+        currentHlsAudioInstance = null;
+      }
+
+      stopCurrentAudioElement();
+      stopCurrentVideoElement();
+    }
+
     // For two-digit channel input
     let channelInput = [];
     let channelInputTimer = null;
@@ -57,6 +108,13 @@ let isPickerVisible = true;
         sideMenu.classList.remove('hidden');
         contentArea.classList.remove('expanded');
         isMenuVisible = true;
+      }
+    }
+
+    function updateMuteButtonVisibility(hidden) {
+      const muteButton = document.getElementById('muteButton');
+      if (muteButton) {
+        muteButton.style.display = hidden ? 'none' : 'flex';
       }
     }
 
@@ -88,8 +146,7 @@ let isPickerVisible = true;
     document.getElementById('muteButton').addEventListener('click', toggleMute);
 
     function playStream(url, headers = null) {
-      clearAudioVideoSyncInterval();
-      stopCurrentAudioElement();
+      cleanupAllMedia();
       return new Promise((resolve, reject) => {
        const videoElement = document.createElement('video');
        videoElement.className = 'video-element';
@@ -120,10 +177,22 @@ let isPickerVisible = true;
            };
          }
          const hls = new Hls(hlsConfig);
+         currentHlsVideoInstance = hls;
          hls.loadSource(url);
          hls.attachMedia(videoElement);
          hls.on(Hls.Events.MANIFEST_PARSED, function () {
           videoElement.play().then(resolve).catch(reject);
+        });
+         hls.on(Hls.Events.ERROR, function (event, data) {
+          if (data.fatal) {
+            try {
+              hls.destroy();
+            } catch (e) {}
+            if (currentHlsVideoInstance === hls) {
+              currentHlsVideoInstance = null;
+            }
+            reject(new Error('HLS playback error: ' + (data.details || 'unknown')));
+          }
         });
        } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
          // If native HLS is supported, we cannot set custom request headers from the browser
@@ -167,7 +236,7 @@ let isPickerVisible = true;
       document.querySelectorAll('.channel-menu-item').forEach(item => item.classList.remove('active'));
       document.querySelector(`[data-index="${index}"]`).classList.add('active');
       
-      if (url.includes('php?m3u8')) {
+      if (url.includes('php?m3u8Old')) {
         const iframe = document.createElement('iframe');
         iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
   iframe.style.width = '100%';
@@ -186,27 +255,20 @@ let isPickerVisible = true;
         isPickerVisible = false;
       } else {
           if (name === '12-kanal-il') {
-            const iframe = document.createElement('iframe');
-            iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = 'none';
-            iframe.allowFullscreen = true;
-            iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
-            document.getElementById('videoContainer').innerHTML = '';
-            document.getElementById('videoContainer').appendChild(iframe);
-            document.getElementById('videoContainer').style.display = 'block';
-            // Hide channel picker and show back button
-            document.getElementById('channelPicker').style.display = 'none';
-            document.getElementById('backButton').style.display = 'block';
-            isPickerVisible = false;
-          } else if (name === '13-kanal-il1') {
-            // Play 13-kanal-il using Hls.js but set headers to mimic VLC's User-Agent
             const vlcHeaders = {
               'User-Agent': 'VLC/3.0.11',
               'Accept': '*/*'
             };
-            playStream(url, vlcHeaders);
+            playVideoAndAudio(
+              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/keshet_12_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
+              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/keshet_12_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000',
+              vlcHeaders
+            );
+          } else if (name === '13-kanal-il1') {
+            playVideoAndAudio(
+              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
+              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000'
+            );
           } else if (name === '13-kanal-il') {
           playVideoAndAudio(
             'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
@@ -269,28 +331,20 @@ let isPickerVisible = true;
           isPickerVisible = false;
         } else {
           if (name === '12-kanal-il') {
-            const iframe = document.createElement('iframe');
-            iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = 'none';
-            iframe.allowFullscreen = true;
-            iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
-
-            document.getElementById('videoContainer').innerHTML = '';
-            document.getElementById('videoContainer').appendChild(iframe);
-            document.getElementById('videoContainer').style.display = 'block';
-
-            // Hide channel picker and show back button
-            document.getElementById('channelPicker').style.display = 'none';
-            document.getElementById('backButton').style.display = 'block';
-            isPickerVisible = false;
-          } else if (name === '13-kanal-il') {
             const vlcHeaders = {
               'User-Agent': 'VLC/3.0.11',
               'Accept': '*/*'
             };
-            playStream(url, vlcHeaders);
+            playVideoAndAudio(
+              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/keshet_12_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
+              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/keshet_12_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000',
+              vlcHeaders
+            );
+          } else if (name === '13-kanal-il') {
+            playVideoAndAudio(
+              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
+              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000'
+            );
           } else if (name === '13-kanal-il1') {
             playVideoAndAudio(
               'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
@@ -559,9 +613,8 @@ function resetChannelInput() {
 }
 
 // New function to play separate video and audio streams for specific channel
-function playVideoAndAudio(videoUrl, audioUrl) {
-  clearAudioVideoSyncInterval();
-  stopCurrentAudioElement();
+function playVideoAndAudio(videoUrl, audioUrl, headers = null) {
+  cleanupAllMedia();
 
   return new Promise((resolve, reject) => {
     const videoElement = document.createElement('video');
@@ -604,10 +657,16 @@ function playVideoAndAudio(videoUrl, audioUrl) {
 
       if (hlsVideo) {
         try { hlsVideo.destroy(); } catch (_error) {}
+        if (currentHlsVideoInstance === hlsVideo) {
+          currentHlsVideoInstance = null;
+        }
         hlsVideo = null;
       }
       if (hlsAudio) {
         try { hlsAudio.destroy(); } catch (_error) {}
+        if (currentHlsAudioInstance === hlsAudio) {
+          currentHlsAudioInstance = null;
+        }
         hlsAudio = null;
       }
 
@@ -830,8 +889,27 @@ function playVideoAndAudio(videoUrl, audioUrl) {
         backBufferLength: 0
       };
 
+      // Add headers support if provided
+      if (headers && typeof headers === 'object') {
+        hlsConfig.xhrSetup = function (xhr, url) {
+          try {
+            for (const key in headers) {
+              if (Object.prototype.hasOwnProperty.call(headers, key)) {
+                xhr.setRequestHeader(key, headers[key]);
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to set custom headers on XHR:', e);
+          }
+        };
+      }
+
       hlsVideo = new Hls(hlsConfig);
       hlsAudio = new Hls(hlsConfig);
+      
+      // Store HLS instances globally for cleanup
+      currentHlsVideoInstance = hlsVideo;
+      currentHlsAudioInstance = hlsAudio;
 
       const handleFatalError = (label, data) => {
         if (!data || !data.fatal) return;
