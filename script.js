@@ -3,6 +3,44 @@ let isPickerVisible = true;
     const sideMenu = document.getElementById('sideMenu');
     const contentArea = document.getElementById('contentArea');    let isFilterApplied = true;    let currentVideoElement = null;
     let isMuted = true; // Start muted for autoplay compatibility
+    let currentAudioElement = null;
+    let audioVideoSyncInterval = null;
+
+    function clearAudioVideoSyncInterval() {
+      if (audioVideoSyncInterval) {
+        clearInterval(audioVideoSyncInterval);
+        audioVideoSyncInterval = null;
+      }
+    }
+
+    function stopCurrentAudioElement() {
+      if (!currentAudioElement) return;
+
+      try {
+        currentAudioElement.pause();
+      } catch (error) {
+        console.warn('Failed to pause auxiliary audio stream:', error);
+      }
+
+      try {
+        currentAudioElement.playbackRate = 1;
+      } catch (_error) {
+        // No-op
+      }
+
+      try {
+        currentAudioElement.removeAttribute('src');
+        currentAudioElement.load();
+      } catch (error) {
+        console.warn('Failed to reset auxiliary audio stream:', error);
+      }
+
+      if (currentAudioElement.parentElement) {
+        currentAudioElement.parentElement.removeChild(currentAudioElement);
+      }
+
+      currentAudioElement = null;
+    }
 
     // For two-digit channel input
     let channelInput = [];
@@ -25,9 +63,14 @@ let isPickerVisible = true;
     function toggleMute() {
       const muteButton = document.getElementById('muteButton');
       
-      if (currentVideoElement) {
+      if (currentVideoElement || currentAudioElement) {
         isMuted = !isMuted;
-        currentVideoElement.muted = isMuted;
+        if (currentVideoElement) {
+          currentVideoElement.muted = isMuted;
+        }
+        if (currentAudioElement) {
+          currentAudioElement.muted = isMuted;
+        }
         
         if (isMuted) {
           muteButton.textContent = '🔇';
@@ -45,6 +88,8 @@ let isPickerVisible = true;
     document.getElementById('muteButton').addEventListener('click', toggleMute);
 
     function playStream(url, headers = null) {
+      clearAudioVideoSyncInterval();
+      stopCurrentAudioElement();
       return new Promise((resolve, reject) => {
        const videoElement = document.createElement('video');
        videoElement.className = 'video-element';
@@ -55,6 +100,7 @@ let isPickerVisible = true;
 
        // Store reference to current video element
        currentVideoElement = videoElement;
+       currentAudioElement = null;
 
        // Check if HLS.js is supported
        if (Hls.isSupported()) {
@@ -154,14 +200,14 @@ let isPickerVisible = true;
             document.getElementById('channelPicker').style.display = 'none';
             document.getElementById('backButton').style.display = 'block';
             isPickerVisible = false;
-          } else if (name === '13-kanal-il') {
+          } else if (name === '13-kanal-il1') {
             // Play 13-kanal-il using Hls.js but set headers to mimic VLC's User-Agent
             const vlcHeaders = {
               'User-Agent': 'VLC/3.0.11',
               'Accept': '*/*'
             };
             playStream(url, vlcHeaders);
-          } else if (name === '13-kanal-il1') {
+          } else if (name === '13-kanal-il') {
           playVideoAndAudio(
             'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
             'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000'
@@ -514,63 +560,315 @@ function resetChannelInput() {
 
 // New function to play separate video and audio streams for specific channel
 function playVideoAndAudio(videoUrl, audioUrl) {
+  clearAudioVideoSyncInterval();
+  stopCurrentAudioElement();
+
   return new Promise((resolve, reject) => {
     const videoElement = document.createElement('video');
     videoElement.className = 'video-element';
     videoElement.controls = true;
-    videoElement.autoplay = true;
+    videoElement.autoplay = false;
+    videoElement.preload = 'auto';
     videoElement.muted = false;
-    isMuted = false;
+    videoElement.volume = 1;
+    videoElement.setAttribute('playsinline', '');
+    videoElement.setAttribute('webkit-playsinline', '');
+
     const audioElement = document.createElement('video');
     audioElement.style.display = 'none';
-    audioElement.autoplay = true;
+    audioElement.autoplay = false;
+    audioElement.preload = 'auto';
     audioElement.muted = false;
-    // Store video element reference
+    audioElement.volume = 1;
+    audioElement.setAttribute('playsinline', '');
+    audioElement.setAttribute('webkit-playsinline', '');
+
+    isMuted = false;
     currentVideoElement = videoElement;
+    currentAudioElement = audioElement;
+
     const container = document.getElementById('videoContainer');
-    // Use HLS.js for both streams
-    if (Hls.isSupported()) {
-      const hlsVideo = new Hls();
-      hlsVideo.loadSource(videoUrl);
-      hlsVideo.attachMedia(videoElement);
-      const hlsAudio = new Hls();
-      hlsAudio.loadSource(audioUrl);
-      hlsAudio.attachMedia(audioElement);
-      hlsVideo.on(Hls.Events.MANIFEST_PARSED, () => {
-        container.innerHTML = '';
-        container.appendChild(videoElement);
-        container.appendChild(audioElement);
-        container.style.display = 'block';
-        document.getElementById('channelPicker').style.display = 'none';
-        document.getElementById('backButton').style.display = 'block';
-        updateMuteButtonVisibility(false);
-        const muteButton = document.getElementById('muteButton');
+    const channelPicker = document.getElementById('channelPicker');
+    const backButton = document.getElementById('backButton');
+    const muteButton = document.getElementById('muteButton');
+
+    let hlsVideo = null;
+    let hlsAudio = null;
+    let settled = false;
+
+    const finalizeReject = (error) => {
+      if (settled) return;
+      settled = true;
+
+      clearAudioVideoSyncInterval();
+
+      if (hlsVideo) {
+        try { hlsVideo.destroy(); } catch (_error) {}
+        hlsVideo = null;
+      }
+      if (hlsAudio) {
+        try { hlsAudio.destroy(); } catch (_error) {}
+        hlsAudio = null;
+      }
+
+      [audioElement, videoElement].forEach(element => {
+        if (!element) return;
+        try {
+          element.pause();
+        } catch (_error) {
+          // No-op
+        }
+        try {
+          element.removeAttribute('src');
+          element.load();
+        } catch (_error) {
+          // No-op
+        }
+        if (element.parentElement) {
+          element.parentElement.removeChild(element);
+        }
+      });
+
+      if (currentAudioElement === audioElement) {
+        currentAudioElement = null;
+      }
+      if (currentVideoElement === videoElement) {
+        currentVideoElement = null;
+      }
+
+      reject(error);
+    };
+
+    const waitForMediaReady = (media, timeout = 12000) => new Promise((resolveReady, rejectReady) => {
+      if (media.readyState >= 2) {
+        resolveReady();
+        return;
+      }
+
+      let timeoutId = null;
+
+      const cleanupListeners = () => {
+        media.removeEventListener('canplay', onReady);
+        media.removeEventListener('loadedmetadata', onReady);
+        media.removeEventListener('error', onError);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+      };
+
+      const onReady = () => {
+        cleanupListeners();
+        resolveReady();
+      };
+
+      const onError = () => {
+        cleanupListeners();
+        rejectReady(new Error('Failed to buffer media stream'));
+      };
+
+      timeoutId = setTimeout(() => {
+        cleanupListeners();
+        rejectReady(new Error('Timed out while buffering media stream'));
+      }, timeout);
+
+      media.addEventListener('canplay', onReady, { once: true });
+      media.addEventListener('loadedmetadata', onReady, { once: true });
+      media.addEventListener('error', onError, { once: true });
+    });
+
+    const waitForSeekable = (media, maxWait = 10000) => new Promise(resolveSeekable => {
+      if (media.seekable && media.seekable.length > 0) {
+        resolveSeekable();
+        return;
+      }
+
+      let elapsed = 0;
+      const step = 250;
+
+      const intervalId = setInterval(() => {
+        if (media.seekable && media.seekable.length > 0) {
+          clearInterval(intervalId);
+          resolveSeekable();
+          return;
+        }
+
+        elapsed += step;
+        if (elapsed >= maxWait) {
+          clearInterval(intervalId);
+          resolveSeekable();
+        }
+      }, step);
+    });
+
+    const alignInitialPosition = () => {
+      const getSeekableEnd = (media) => {
+        if (!media.seekable || media.seekable.length === 0) return null;
+        try {
+          return media.seekable.end(media.seekable.length - 1);
+        } catch (_error) {
+          return null;
+        }
+      };
+
+      let target = null;
+      const videoEnd = getSeekableEnd(videoElement);
+      const audioEnd = getSeekableEnd(audioElement);
+
+      if (videoEnd !== null && audioEnd !== null) {
+        target = Math.min(videoEnd, audioEnd) - 1;
+        if (!Number.isFinite(target) || target <= 0) {
+          target = null;
+        }
+      }
+
+      if (target === null) {
+        const fallback = Math.max(videoElement.currentTime || 0, audioElement.currentTime || 0);
+        if (fallback > 0) {
+          target = fallback;
+        }
+      }
+
+      if (target !== null && target > 0) {
+        try { videoElement.currentTime = target; } catch (_error) {}
+        try { audioElement.currentTime = target; } catch (_error) {}
+      }
+    };
+
+    const updateMuteButton = () => {
+      if (!muteButton) return;
+
+      if (isMuted) {
+        muteButton.textContent = '🔇';
+        muteButton.classList.add('muted');
+        muteButton.title = 'Unmute';
+      } else {
         muteButton.textContent = '🔊';
         muteButton.classList.remove('muted');
         muteButton.title = 'Mute';
-        videoElement.play()
-          .then(() => audioElement.play().then(resolve).catch(reject))
-          .catch(reject);
+      }
+    };
+
+    const setupUi = () => {
+      container.innerHTML = '';
+      container.appendChild(videoElement);
+      container.appendChild(audioElement);
+      container.style.display = 'block';
+
+      if (channelPicker) {
+        channelPicker.style.display = 'none';
+      }
+
+      if (backButton) {
+        backButton.style.display = 'block';
+      }
+
+      updateMuteButtonVisibility(false);
+      updateMuteButton();
+    };
+
+    const startSyncMonitor = () => {
+      clearAudioVideoSyncInterval();
+      try {
+        audioElement.playbackRate = 1;
+      } catch (_error) {
+        // No-op
+      }
+
+      audioVideoSyncInterval = setInterval(() => {
+        if (!currentVideoElement || !currentAudioElement) return;
+        if (videoElement.readyState < 2 || audioElement.readyState < 2) return;
+
+        const diff = audioElement.currentTime - videoElement.currentTime;
+        if (!Number.isFinite(diff)) return;
+
+        if (Math.abs(diff) > 1.5) {
+          try {
+            audioElement.currentTime = videoElement.currentTime;
+          } catch (error) {
+            console.warn('Hard audio sync failed:', error);
+          }
+          audioElement.playbackRate = 1;
+          return;
+        }
+
+        if (Math.abs(diff) > 0.1) {
+          audioElement.playbackRate = diff > 0 ? 0.97 : 1.03;
+        } else if (audioElement.playbackRate !== 1) {
+          audioElement.playbackRate = 1;
+        }
+      }, 500);
+    };
+
+    const beginPlayback = async () => {
+      try {
+        setupUi();
+        await waitForMediaReady(videoElement);
+        await waitForMediaReady(audioElement);
+        await Promise.all([waitForSeekable(videoElement), waitForSeekable(audioElement)]);
+        alignInitialPosition();
+        await videoElement.play();
+        await audioElement.play();
+
+        startSyncMonitor();
+
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      } catch (error) {
+        finalizeReject(error);
+      }
+    };
+
+    if (Hls.isSupported()) {
+      const hlsConfig = {
+        enableWorker: true,
+        lowLatencyMode: false,
+        liveSyncDuration: 6,
+        liveMaxLatencyDuration: 18,
+        backBufferLength: 0
+      };
+
+      hlsVideo = new Hls(hlsConfig);
+      hlsAudio = new Hls(hlsConfig);
+
+      const handleFatalError = (label, data) => {
+        if (!data || !data.fatal) return;
+        const detail = data.details || data.type || 'unknown error';
+        finalizeReject(new Error(`Failed to load ${label} stream (${detail})`));
+      };
+
+      hlsVideo.on(Hls.Events.ERROR, (_event, data) => handleFatalError('video', data));
+      hlsAudio.on(Hls.Events.ERROR, (_event, data) => handleFatalError('audio', data));
+
+      const videoManifestReady = new Promise((res) => {
+        hlsVideo.on(Hls.Events.MANIFEST_PARSED, () => res());
       });
+      const audioManifestReady = new Promise((res) => {
+        hlsAudio.on(Hls.Events.MANIFEST_PARSED, () => res());
+      });
+
+      hlsVideo.loadSource(videoUrl);
+      hlsVideo.attachMedia(videoElement);
+
+      hlsAudio.loadSource(audioUrl);
+      hlsAudio.attachMedia(audioElement);
+
+      Promise.all([videoManifestReady, audioManifestReady])
+        .then(() => beginPlayback())
+        .catch(finalizeReject);
     } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
       videoElement.src = videoUrl;
       audioElement.src = audioUrl;
-      videoElement.addEventListener('loadedmetadata', () => {
-        container.innerHTML = '';
-        container.appendChild(videoElement);
-        container.appendChild(audioElement);
-        container.style.display = 'block';
-        document.getElementById('channelPicker').style.display = 'none';
-        document.getElementById('backButton').style.display = 'block';
-        updateMuteButtonVisibility(false);
-        const muteButton = document.getElementById('muteButton');
-        muteButton.textContent = '🔊';
-        muteButton.classList.remove('muted');
-        muteButton.title = 'Mute';
-        Promise.all([videoElement.play(), audioElement.play()]).then(resolve).catch(reject);
-      });
+
+      const onError = () => finalizeReject(new Error('Failed to load HLS streams natively'));
+      videoElement.addEventListener('error', onError, { once: true });
+      audioElement.addEventListener('error', onError, { once: true });
+
+      beginPlayback();
     } else {
-      reject(new Error('HLS is not supported'));
+      finalizeReject(new Error('HLS is not supported'));
     }
   });
 }
