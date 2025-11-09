@@ -399,7 +399,7 @@ let isPickerVisible = true;
         document.getElementById('backButton').style.display = 'block';
         isPickerVisible = false;
       } else {
-          if (name === '12-kanal-il') {
+          if (name === '12-kanal-il1') {
             const vlcHeaders = {
               'User-Agent': 'VLC/3.0.11',
               'Accept': '*/*'
@@ -414,7 +414,7 @@ let isPickerVisible = true;
                 loadingMessage: 'Buffering Keshet 12 (~5s)...'
               }
             );
-          } else if (name === '13-kanal-il1') {
+          } else if (name === '13-kanal-il2') {
             playVideoAndAudio(
               'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
               'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000',
@@ -424,7 +424,7 @@ let isPickerVisible = true;
                 loadingMessage: 'Buffering Reshet 13 (~5s)...'
               }
             );
-          } else if (name === '13-kanal-il') {
+          } else if (name === '13-kanal-il3') {
           playVideoAndAudio(
             'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
             'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000',
