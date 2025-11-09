@@ -105,10 +105,11 @@ let isPickerVisible = true;
       if (url.includes('php?m3u8')) {
         const iframe = document.createElement('iframe');
         iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
-        iframe.style.width = '100%';
-        iframe.style.height = '100%';
-        iframe.style.border = 'none';
-        iframe.allowfullscreen = true;
+  iframe.style.width = '100%';
+  iframe.style.height = '100%';
+  iframe.style.border = 'none';
+  iframe.allowFullscreen = true;
+  iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
         
         document.getElementById('videoContainer').innerHTML = '';
         document.getElementById('videoContainer').appendChild(iframe);
@@ -119,7 +120,22 @@ let isPickerVisible = true;
         document.getElementById('backButton').style.display = 'block';
         isPickerVisible = false;
       } else {
-        if (name === '13-kanal-il1') {
+          if (name === '12-kanal-il') {
+            const iframe = document.createElement('iframe');
+            iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            iframe.allowFullscreen = true;
+            iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
+            document.getElementById('videoContainer').innerHTML = '';
+            document.getElementById('videoContainer').appendChild(iframe);
+            document.getElementById('videoContainer').style.display = 'block';
+            // Hide channel picker and show back button
+            document.getElementById('channelPicker').style.display = 'none';
+            document.getElementById('backButton').style.display = 'block';
+            isPickerVisible = false;
+          } else if (name === '13-kanal-il1') {
           playVideoAndAudio(
             'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
             'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000'
@@ -169,7 +185,9 @@ let isPickerVisible = true;
           iframe.style.width = '100%';
           iframe.style.height = '100%';
           iframe.style.border = 'none';
-          iframe.allowfullscreen = true;          document.getElementById('videoContainer').innerHTML = '';
+          iframe.allowFullscreen = true;
+          iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
+          document.getElementById('videoContainer').innerHTML = '';
           document.getElementById('videoContainer').appendChild(iframe);
           document.getElementById('videoContainer').style.display = 'block';
           
@@ -178,7 +196,24 @@ let isPickerVisible = true;
           document.getElementById('backButton').style.display = 'block';
           isPickerVisible = false;
         } else {
-          if (name === '13-kanal-il') {
+          if (name === '12-kanal-il') {
+            const iframe = document.createElement('iframe');
+            iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            iframe.allowFullscreen = true;
+            iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
+
+            document.getElementById('videoContainer').innerHTML = '';
+            document.getElementById('videoContainer').appendChild(iframe);
+            document.getElementById('videoContainer').style.display = 'block';
+
+            // Hide channel picker and show back button
+            document.getElementById('channelPicker').style.display = 'none';
+            document.getElementById('backButton').style.display = 'block';
+            isPickerVisible = false;
+          } else if (name === '13-kanal-il1') {
             playVideoAndAudio(
               'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
               'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000'
@@ -306,8 +341,8 @@ let isPickerVisible = true;
           // Auto-play first channel if supported, otherwise show menu
           if (channels.length > 0) {
             const firstChannel = channels[0];
-            // Skip iframe-based channels for auto-play
-            if (!firstChannel.url.includes('php?m3u8')) {
+            // Skip iframe-based channels or special iframe channels for auto-play
+            if (!firstChannel.url.includes('php?m3u8') && firstChannel.name !== '12-kanal-il') {
               // Hide side menu automatically
               if (isMenuVisible) toggleSideMenu();
               // Attempt to play via playStream, fallback to picker on failure
