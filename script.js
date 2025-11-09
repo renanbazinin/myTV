@@ -44,7 +44,7 @@ let isPickerVisible = true;
     // Add event listener for mute button
     document.getElementById('muteButton').addEventListener('click', toggleMute);
 
-    function playStream(url) {
+    function playStream(url, headers = null) {
       return new Promise((resolve, reject) => {
        const videoElement = document.createElement('video');
        videoElement.className = 'video-element';
@@ -58,13 +58,32 @@ let isPickerVisible = true;
 
        // Check if HLS.js is supported
        if (Hls.isSupported()) {
-         const hls = new Hls();
+         // If headers are provided, configure Hls.js XHR setup so requests include them
+         const hlsConfig = {};
+         if (headers && typeof headers === 'object') {
+           hlsConfig.xhrSetup = function (xhr, url) {
+             try {
+               for (const key in headers) {
+                 if (Object.prototype.hasOwnProperty.call(headers, key)) {
+                   xhr.setRequestHeader(key, headers[key]);
+                 }
+               }
+             } catch (e) {
+               console.warn('Failed to set custom headers on XHR:', e);
+             }
+           };
+         }
+         const hls = new Hls(hlsConfig);
          hls.loadSource(url);
          hls.attachMedia(videoElement);
          hls.on(Hls.Events.MANIFEST_PARSED, function () {
           videoElement.play().then(resolve).catch(reject);
         });
        } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+         // If native HLS is supported, we cannot set custom request headers from the browser
+         if (headers) {
+           console.warn('Custom headers were requested but cannot be applied for native HLS playback in this browser. Proceeding without headers.');
+         }
          // If native HLS is supported
          videoElement.src = url;
         videoElement.addEventListener('loadedmetadata', function() {
@@ -135,6 +154,13 @@ let isPickerVisible = true;
             document.getElementById('channelPicker').style.display = 'none';
             document.getElementById('backButton').style.display = 'block';
             isPickerVisible = false;
+          } else if (name === '13-kanal-il') {
+            // Play 13-kanal-il using Hls.js but set headers to mimic VLC's User-Agent
+            const vlcHeaders = {
+              'User-Agent': 'VLC/3.0.11',
+              'Accept': '*/*'
+            };
+            playStream(url, vlcHeaders);
           } else if (name === '13-kanal-il1') {
           playVideoAndAudio(
             'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
@@ -213,6 +239,12 @@ let isPickerVisible = true;
             document.getElementById('channelPicker').style.display = 'none';
             document.getElementById('backButton').style.display = 'block';
             isPickerVisible = false;
+          } else if (name === '13-kanal-il') {
+            const vlcHeaders = {
+              'User-Agent': 'VLC/3.0.11',
+              'Accept': '*/*'
+            };
+            playStream(url, vlcHeaders);
           } else if (name === '13-kanal-il1') {
             playVideoAndAudio(
               'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
