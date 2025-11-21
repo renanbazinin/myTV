@@ -1,587 +1,598 @@
 let isPickerVisible = true;
-    let isMenuVisible = true;
-    const sideMenu = document.getElementById('sideMenu');
-    const contentArea = document.getElementById('contentArea');    let isFilterApplied = true;    let currentVideoElement = null;
-    let isMuted = true; // Start muted for autoplay compatibility
-    let currentAudioElement = null;
-    let audioVideoSyncInterval = null;
-    let currentHlsVideoInstance = null;
-    let currentHlsAudioInstance = null;
-    let loadingStatusElement = null;
+let isMenuVisible = true;
+const sideMenu = document.getElementById('sideMenu');
+const contentArea = document.getElementById('contentArea'); let isFilterApplied = true; let currentVideoElement = null;
+let isMuted = true; // Start muted for autoplay compatibility
+let currentAudioElement = null;
+let audioVideoSyncInterval = null;
+let currentHlsVideoInstance = null;
+let currentHlsAudioInstance = null;
+let loadingStatusElement = null;
 
-    function showLoadingMessage(message = 'Loading buffer...') {
-      const container = document.getElementById('videoContainer');
-      if (!container) return;
+function showLoadingMessage(message = 'Loading buffer...') {
+  const container = document.getElementById('videoContainer');
+  if (!container) return;
 
-      if (!loadingStatusElement) {
-        loadingStatusElement = document.createElement('div');
-        loadingStatusElement.className = 'loading-status-overlay';
-        loadingStatusElement.style.position = 'absolute';
-        loadingStatusElement.style.top = '50%';
-        loadingStatusElement.style.left = '50%';
-        loadingStatusElement.style.transform = 'translate(-50%, -50%)';
-        loadingStatusElement.style.padding = '0.85rem 1.5rem';
-        loadingStatusElement.style.borderRadius = '999px';
-        loadingStatusElement.style.background = 'rgba(15, 15, 15, 0.75)';
-        loadingStatusElement.style.color = '#fff';
-        loadingStatusElement.style.fontSize = '1rem';
-        loadingStatusElement.style.fontWeight = '600';
-        loadingStatusElement.style.letterSpacing = '0.02em';
-        loadingStatusElement.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.35)';
-        loadingStatusElement.style.zIndex = '10';
-        loadingStatusElement.style.display = 'none';
-        loadingStatusElement.style.alignItems = 'center';
-        loadingStatusElement.style.justifyContent = 'center';
-        loadingStatusElement.style.gap = '0.65rem';
-        loadingStatusElement.style.pointerEvents = 'none';
+  if (!loadingStatusElement) {
+    loadingStatusElement = document.createElement('div');
+    loadingStatusElement.className = 'loading-status-overlay';
+    loadingStatusElement.style.position = 'absolute';
+    loadingStatusElement.style.top = '50%';
+    loadingStatusElement.style.left = '50%';
+    loadingStatusElement.style.transform = 'translate(-50%, -50%)';
+    loadingStatusElement.style.padding = '0.85rem 1.5rem';
+    loadingStatusElement.style.borderRadius = '999px';
+    loadingStatusElement.style.background = 'rgba(15, 15, 15, 0.75)';
+    loadingStatusElement.style.color = '#fff';
+    loadingStatusElement.style.fontSize = '1rem';
+    loadingStatusElement.style.fontWeight = '600';
+    loadingStatusElement.style.letterSpacing = '0.02em';
+    loadingStatusElement.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.35)';
+    loadingStatusElement.style.zIndex = '10';
+    loadingStatusElement.style.display = 'none';
+    loadingStatusElement.style.alignItems = 'center';
+    loadingStatusElement.style.justifyContent = 'center';
+    loadingStatusElement.style.gap = '0.65rem';
+    loadingStatusElement.style.pointerEvents = 'none';
 
-        const spinner = document.createElement('span');
-        spinner.className = 'loading-spinner';
-        spinner.style.width = '1rem';
-        spinner.style.height = '1rem';
-        spinner.style.border = '2px solid rgba(255, 255, 255, 0.2)';
-        spinner.style.borderTopColor = '#fff';
-        spinner.style.borderRadius = '50%';
-        spinner.style.animation = 'loading-spin 1s linear infinite';
+    const spinner = document.createElement('span');
+    spinner.className = 'loading-spinner';
+    spinner.style.width = '1rem';
+    spinner.style.height = '1rem';
+    spinner.style.border = '2px solid rgba(255, 255, 255, 0.2)';
+    spinner.style.borderTopColor = '#fff';
+    spinner.style.borderRadius = '50%';
+    spinner.style.animation = 'loading-spin 1s linear infinite';
 
-        const textNode = document.createElement('span');
-        textNode.className = 'loading-text';
+    const textNode = document.createElement('span');
+    textNode.className = 'loading-text';
 
-        loadingStatusElement.appendChild(spinner);
-        loadingStatusElement.appendChild(textNode);
-      }
+    loadingStatusElement.appendChild(spinner);
+    loadingStatusElement.appendChild(textNode);
+  }
 
-      const textElement = loadingStatusElement.querySelector('.loading-text');
-      if (textElement) {
-        textElement.textContent = message;
-      } else {
-        loadingStatusElement.textContent = message;
-      }
+  const textElement = loadingStatusElement.querySelector('.loading-text');
+  if (textElement) {
+    textElement.textContent = message;
+  } else {
+    loadingStatusElement.textContent = message;
+  }
 
-      if (loadingStatusElement.parentElement !== container) {
-        container.appendChild(loadingStatusElement);
-      }
+  if (loadingStatusElement.parentElement !== container) {
+    container.appendChild(loadingStatusElement);
+  }
 
-      loadingStatusElement.style.display = 'flex';
-    }
+  loadingStatusElement.style.display = 'flex';
+}
 
-    function hideLoadingMessage() {
-      if (loadingStatusElement) {
-        loadingStatusElement.style.display = 'none';
-      }
-    }
+function hideLoadingMessage() {
+  if (loadingStatusElement) {
+    loadingStatusElement.style.display = 'none';
+  }
+}
 
-    // Inject keyframes for spinner if not already present
-    (function ensureLoadingSpinnerStyles() {
-      const existing = document.getElementById('loading-spinner-styles');
-      if (existing) return;
+// Inject keyframes for spinner if not already present
+(function ensureLoadingSpinnerStyles() {
+  const existing = document.getElementById('loading-spinner-styles');
+  if (existing) return;
 
-      const style = document.createElement('style');
-      style.id = 'loading-spinner-styles';
-      style.textContent = `
+  const style = document.createElement('style');
+  style.id = 'loading-spinner-styles';
+  style.textContent = `
         @keyframes loading-spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
       `;
-      document.head.appendChild(style);
-    })();
+  document.head.appendChild(style);
+})();
 
-    function normalizePlaybackOptions(options) {
-      const defaults = {
-        headers: null,
-        initialLiveBufferSeconds: 0,
-        postReadyDelayMs: 0,
-        loadingMessage: null
-      };
+function normalizePlaybackOptions(options) {
+  const defaults = {
+    headers: null,
+    initialLiveBufferSeconds: 0,
+    postReadyDelayMs: 0,
+    loadingMessage: null
+  };
 
-      if (!options) {
-        return defaults;
-      }
+  if (!options) {
+    return defaults;
+  }
 
-      if (typeof options !== 'object' || Array.isArray(options)) {
-        return defaults;
-      }
+  if (typeof options !== 'object' || Array.isArray(options)) {
+    return defaults;
+  }
 
-      const recognizedKeys = ['headers', 'initialLiveBufferSeconds', 'postReadyDelayMs', 'loadingMessage'];
-      const hasRecognizedKey = recognizedKeys.some(key => Object.prototype.hasOwnProperty.call(options, key));
+  const recognizedKeys = ['headers', 'initialLiveBufferSeconds', 'postReadyDelayMs', 'loadingMessage'];
+  const hasRecognizedKey = recognizedKeys.some(key => Object.prototype.hasOwnProperty.call(options, key));
 
-      if (hasRecognizedKey) {
-        return {
-          headers: options.headers || null,
-          initialLiveBufferSeconds: typeof options.initialLiveBufferSeconds === 'number' ? options.initialLiveBufferSeconds : 0,
-          postReadyDelayMs: typeof options.postReadyDelayMs === 'number' ? options.postReadyDelayMs : 0,
-          loadingMessage: typeof options.loadingMessage === 'string' ? options.loadingMessage : null
+  if (hasRecognizedKey) {
+    return {
+      headers: options.headers || null,
+      initialLiveBufferSeconds: typeof options.initialLiveBufferSeconds === 'number' ? options.initialLiveBufferSeconds : 0,
+      postReadyDelayMs: typeof options.postReadyDelayMs === 'number' ? options.postReadyDelayMs : 0,
+      loadingMessage: typeof options.loadingMessage === 'string' ? options.loadingMessage : null
+    };
+  }
+
+  return {
+    ...defaults,
+    headers: options
+  };
+}
+
+function clearAudioVideoSyncInterval() {
+  if (audioVideoSyncInterval) {
+    clearInterval(audioVideoSyncInterval);
+    audioVideoSyncInterval = null;
+  }
+}
+
+function stopCurrentAudioElement() {
+  if (!currentAudioElement) return;
+
+  try {
+    currentAudioElement.pause();
+  } catch (error) {
+    console.warn('Failed to pause auxiliary audio stream:', error);
+  }
+
+  try {
+    currentAudioElement.playbackRate = 1;
+  } catch (_error) {
+    // No-op
+  }
+
+  try {
+    currentAudioElement.removeAttribute('src');
+    currentAudioElement.load();
+  } catch (error) {
+    console.warn('Failed to reset auxiliary audio stream:', error);
+  }
+
+  if (currentAudioElement.parentElement) {
+    currentAudioElement.parentElement.removeChild(currentAudioElement);
+  }
+
+  currentAudioElement = null;
+}
+
+function stopCurrentVideoElement() {
+  if (!currentVideoElement) return;
+
+  try {
+    currentVideoElement.pause();
+  } catch (error) {
+    console.warn('Failed to pause video element:', error);
+  }
+
+  try {
+    currentVideoElement.removeAttribute('src');
+    currentVideoElement.load();
+  } catch (error) {
+    console.warn('Failed to reset video element:', error);
+  }
+
+  if (currentVideoElement.parentElement) {
+    currentVideoElement.parentElement.removeChild(currentVideoElement);
+  }
+
+  currentVideoElement = null;
+}
+
+function cleanupAllMedia() {
+  hideLoadingMessage();
+  clearAudioVideoSyncInterval();
+
+  // Destroy HLS instances
+  if (currentHlsVideoInstance) {
+    try {
+      currentHlsVideoInstance.destroy();
+    } catch (error) {
+      console.warn('Failed to destroy HLS video instance:', error);
+    }
+    currentHlsVideoInstance = null;
+  }
+
+  if (currentHlsAudioInstance) {
+    try {
+      currentHlsAudioInstance.destroy();
+    } catch (error) {
+      console.warn('Failed to destroy HLS audio instance:', error);
+    }
+    currentHlsAudioInstance = null;
+  }
+
+  stopCurrentAudioElement();
+  stopCurrentVideoElement();
+}
+
+// For two-digit channel input
+let channelInput = [];
+let channelInputTimer = null;
+const channelInputDisplay = document.getElementById('channel-input-display');
+const channelInputSpans = channelInputDisplay ? channelInputDisplay.querySelectorAll('span') : [];
+
+function toggleSideMenu() {
+  if (isMenuVisible) {
+    sideMenu.classList.add('hidden');
+    contentArea.classList.add('expanded');
+    isMenuVisible = false;
+  } else {
+    sideMenu.classList.remove('hidden');
+    contentArea.classList.remove('expanded');
+    isMenuVisible = true;
+  }
+}
+
+function updateMuteButtonVisibility(hidden) {
+  const muteButton = document.getElementById('muteButton');
+  if (muteButton) {
+    muteButton.style.display = hidden ? 'none' : 'flex';
+  }
+}
+
+function toggleMute() {
+  const muteButton = document.getElementById('muteButton');
+
+  if (currentVideoElement || currentAudioElement) {
+    isMuted = !isMuted;
+    if (currentVideoElement) {
+      currentVideoElement.muted = isMuted;
+    }
+    if (currentAudioElement) {
+      currentAudioElement.muted = isMuted;
+    }
+
+    if (isMuted) {
+      muteButton.textContent = '🔇';
+      muteButton.classList.add('muted');
+      muteButton.title = 'Unmute';
+    } else {
+      muteButton.textContent = '🔊';
+      muteButton.classList.remove('muted');
+      muteButton.title = 'Mute';
+    }
+  }
+}
+
+// Add event listener for mute button
+document.getElementById('muteButton').addEventListener('click', toggleMute);
+
+function playStream(url, headers = null) {
+  cleanupAllMedia();
+  return new Promise((resolve, reject) => {
+    const videoElement = document.createElement('video');
+    videoElement.className = 'video-element';
+    videoElement.controls = true;
+    videoElement.autoplay = true;
+    videoElement.muted = false; // Start unmuted so clicking a channel auto-plays with sound
+    isMuted = false;
+
+    // Store reference to current video element
+    currentVideoElement = videoElement;
+    currentAudioElement = null;
+
+    const container = document.getElementById('videoContainer');
+    const channelPickerElement = document.getElementById('channelPicker');
+    const backButton = document.getElementById('backButton');
+    const muteButton = document.getElementById('muteButton');
+
+    // Check if HLS.js is supported
+    if (Hls.isSupported()) {
+      // If headers are provided, configure Hls.js XHR setup so requests include them
+      const hlsConfig = {};
+      if (headers && typeof headers === 'object') {
+        hlsConfig.xhrSetup = function (xhr, url) {
+          try {
+            for (const key in headers) {
+              if (Object.prototype.hasOwnProperty.call(headers, key)) {
+                xhr.setRequestHeader(key, headers[key]);
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to set custom headers on XHR:', e);
+          }
         };
       }
-
-      return {
-        ...defaults,
-        headers: options
-      };
-    }
-
-    function clearAudioVideoSyncInterval() {
-      if (audioVideoSyncInterval) {
-        clearInterval(audioVideoSyncInterval);
-        audioVideoSyncInterval = null;
-      }
-    }
-
-    function stopCurrentAudioElement() {
-      if (!currentAudioElement) return;
-
-      try {
-        currentAudioElement.pause();
-      } catch (error) {
-        console.warn('Failed to pause auxiliary audio stream:', error);
-      }
-
-      try {
-        currentAudioElement.playbackRate = 1;
-      } catch (_error) {
-        // No-op
-      }
-
-      try {
-        currentAudioElement.removeAttribute('src');
-        currentAudioElement.load();
-      } catch (error) {
-        console.warn('Failed to reset auxiliary audio stream:', error);
-      }
-
-      if (currentAudioElement.parentElement) {
-        currentAudioElement.parentElement.removeChild(currentAudioElement);
-      }
-
-      currentAudioElement = null;
-    }
-
-    function stopCurrentVideoElement() {
-      if (!currentVideoElement) return;
-
-      try {
-        currentVideoElement.pause();
-      } catch (error) {
-        console.warn('Failed to pause video element:', error);
-      }
-
-      try {
-        currentVideoElement.removeAttribute('src');
-        currentVideoElement.load();
-      } catch (error) {
-        console.warn('Failed to reset video element:', error);
-      }
-
-      if (currentVideoElement.parentElement) {
-        currentVideoElement.parentElement.removeChild(currentVideoElement);
-      }
-
-      currentVideoElement = null;
-    }
-
-    function cleanupAllMedia() {
-      hideLoadingMessage();
-      clearAudioVideoSyncInterval();
-      
-      // Destroy HLS instances
-      if (currentHlsVideoInstance) {
-        try {
-          currentHlsVideoInstance.destroy();
-        } catch (error) {
-          console.warn('Failed to destroy HLS video instance:', error);
-        }
-        currentHlsVideoInstance = null;
-      }
-      
-      if (currentHlsAudioInstance) {
-        try {
-          currentHlsAudioInstance.destroy();
-        } catch (error) {
-          console.warn('Failed to destroy HLS audio instance:', error);
-        }
-        currentHlsAudioInstance = null;
-      }
-
-      stopCurrentAudioElement();
-      stopCurrentVideoElement();
-    }
-
-    // For two-digit channel input
-    let channelInput = [];
-    let channelInputTimer = null;
-    const channelInputDisplay = document.getElementById('channel-input-display');
-    const channelInputSpans = channelInputDisplay ? channelInputDisplay.querySelectorAll('span') : [];
-
-    function toggleSideMenu() {
-      if (isMenuVisible) {
-        sideMenu.classList.add('hidden');
-        contentArea.classList.add('expanded');
-        isMenuVisible = false;
-      } else {
-        sideMenu.classList.remove('hidden');
-        contentArea.classList.remove('expanded');
-        isMenuVisible = true;
-      }
-    }
-
-    function updateMuteButtonVisibility(hidden) {
-      const muteButton = document.getElementById('muteButton');
-      if (muteButton) {
-        muteButton.style.display = hidden ? 'none' : 'flex';
-      }
-    }
-
-    function toggleMute() {
-      const muteButton = document.getElementById('muteButton');
-      
-      if (currentVideoElement || currentAudioElement) {
-        isMuted = !isMuted;
-        if (currentVideoElement) {
-          currentVideoElement.muted = isMuted;
-        }
-        if (currentAudioElement) {
-          currentAudioElement.muted = isMuted;
-        }
-        
-        if (isMuted) {
-          muteButton.textContent = '🔇';
-          muteButton.classList.add('muted');
-          muteButton.title = 'Unmute';
-        } else {
-          muteButton.textContent = '🔊';
-          muteButton.classList.remove('muted');
-          muteButton.title = 'Mute';
-        }
-      }
-    }
-
-    // Add event listener for mute button
-    document.getElementById('muteButton').addEventListener('click', toggleMute);
-
-    function playStream(url, headers = null) {
-      cleanupAllMedia();
-      return new Promise((resolve, reject) => {
-       const videoElement = document.createElement('video');
-       videoElement.className = 'video-element';
-       videoElement.controls = true;
-       videoElement.autoplay = true;
-       videoElement.muted = false; // Start unmuted so clicking a channel auto-plays with sound
-       isMuted = false;
-
-       // Store reference to current video element
-       currentVideoElement = videoElement;
-       currentAudioElement = null;
-
-       const container = document.getElementById('videoContainer');
-       const channelPickerElement = document.getElementById('channelPicker');
-       const backButton = document.getElementById('backButton');
-       const muteButton = document.getElementById('muteButton');
-
-       // Check if HLS.js is supported
-       if (Hls.isSupported()) {
-         // If headers are provided, configure Hls.js XHR setup so requests include them
-         const hlsConfig = {};
-         if (headers && typeof headers === 'object') {
-           hlsConfig.xhrSetup = function (xhr, url) {
-             try {
-               for (const key in headers) {
-                 if (Object.prototype.hasOwnProperty.call(headers, key)) {
-                   xhr.setRequestHeader(key, headers[key]);
-                 }
-               }
-             } catch (e) {
-               console.warn('Failed to set custom headers on XHR:', e);
-             }
-           };
-         }
-         const hls = new Hls(hlsConfig);
-         currentHlsVideoInstance = hls;
-         hls.loadSource(url);
-         hls.attachMedia(videoElement);
-         hls.on(Hls.Events.MANIFEST_PARSED, function () {
-          videoElement.play()
-            .then(() => {
-              hideLoadingMessage();
-              resolve();
-            })
-            .catch(error => {
-              hideLoadingMessage();
-              reject(error);
-            });
-        });
-         hls.on(Hls.Events.ERROR, function (event, data) {
-          if (data.fatal) {
-            try {
-              hls.destroy();
-            } catch (e) {}
-            if (currentHlsVideoInstance === hls) {
-              currentHlsVideoInstance = null;
-            }
+      const hls = new Hls(hlsConfig);
+      currentHlsVideoInstance = hls;
+      hls.loadSource(url);
+      hls.attachMedia(videoElement);
+      hls.on(Hls.Events.MANIFEST_PARSED, function () {
+        videoElement.play()
+          .then(() => {
             hideLoadingMessage();
-            reject(new Error('HLS playback error: ' + (data.details || 'unknown')));
+            resolve();
+          })
+          .catch(error => {
+            hideLoadingMessage();
+            reject(error);
+          });
+      });
+      hls.on(Hls.Events.ERROR, function (event, data) {
+        if (data.fatal) {
+          try {
+            hls.destroy();
+          } catch (e) { }
+          if (currentHlsVideoInstance === hls) {
+            currentHlsVideoInstance = null;
           }
-        });
-       } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-         // If native HLS is supported, we cannot set custom request headers from the browser
-         if (headers) {
-           console.warn('Custom headers were requested but cannot be applied for native HLS playback in this browser. Proceeding without headers.');
-         }
-         // If native HLS is supported
-         videoElement.src = url;
-        videoElement.addEventListener('loadedmetadata', function() {
-          videoElement.play()
-            .then(() => {
-              hideLoadingMessage();
-              resolve();
-            })
-            .catch(error => {
-              hideLoadingMessage();
-              reject(error);
-            });
-        });
-       } else {
-        hideLoadingMessage();
-        reject(new Error('HLS is not supported'));
-       }
-
-       if (container) {
-         container.innerHTML = '';
-         container.appendChild(videoElement);
-         container.style.display = 'block';
-       }
-       if (channelPickerElement) {
-         channelPickerElement.style.display = 'none';
-       }
-       if (backButton) {
-         backButton.style.display = 'block';
-       }
-
-       // Show mute button and update its state to unmuted
-       updateMuteButtonVisibility(false);
-       if (muteButton) {
-         muteButton.textContent = '🔊';
-         muteButton.classList.remove('muted');
-         muteButton.title = 'Mute';
-       }
-
-       showLoadingMessage();
-       isPickerVisible = false;
-     });
- }
-
- // Function to play channel from side menu
-    function playChannelFromMenu(url, name, index) {
-      // Hide side menu when channel is selected
-      if (isMenuVisible) {
-        toggleSideMenu();
-      }
-      
-      // Update active channel in menu
-      document.querySelectorAll('.channel-menu-item').forEach(item => item.classList.remove('active'));
-      document.querySelector(`[data-index="${index}"]`).classList.add('active');
-      
-      if (url.includes('php?m3u8Old')) {
-        const iframe = document.createElement('iframe');
-        iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
-  iframe.style.width = '100%';
-  iframe.style.height = '100%';
-  iframe.style.border = 'none';
-  iframe.allowFullscreen = true;
-  iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
-        
-        document.getElementById('videoContainer').innerHTML = '';
-        document.getElementById('videoContainer').appendChild(iframe);
-        document.getElementById('videoContainer').style.display = 'block';
-        
-        // Hide channel picker and show back button
-        document.getElementById('channelPicker').style.display = 'none';
-        document.getElementById('backButton').style.display = 'block';
-        isPickerVisible = false;
-      } else {
-          if (name === '12-kanal-il') {
-            const vlcHeaders = {
-              'User-Agent': 'VLC/3.0.11',
-              'Accept': '*/*'
-            };
-            playStream(
-              url,
-              { headers: vlcHeaders }
-            );
-          } else if (name === '13-kanal-il1') {
-            const vlcHeaders = {
-              'User-Agent': 'VLC/3.0.11',
-              'Accept': '*/*'
-            };
-            playStream(url, vlcHeaders);
-          } else if (name === '13-kanal-il') {
-            const vlcHeaders = {
-              'User-Agent': 'VLC/3.0.11',
-              'Accept': '*/*'
-            };
-            playStream(url, vlcHeaders);
-        } else {
-          playStream(url);
-        }
-      }
-    }function createButton(name, logo, url, groupTitle) {
-      console.log("groupTitle=" + groupTitle);
-      console.log("isFilterApplied=" + isFilterApplied);
-      
-      // Remove the filtering logic from createButton since it's now handled in displayChannels
-      var button = document.createElement('button');
-      button.className = 'channel-button';
-      
-      // Create image element
-      const img = document.createElement('img');
-      img.src = logo;
-      img.alt = name;
-      img.onerror = function() {
-        // Fallback if image fails to load
-        this.style.display = 'none';
-        button.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 80px; background: var(--glass-bg); border-radius: 12px; margin-bottom: 0.5rem; font-size: 2rem;">📺</div>' + name;
-      };
-      
-      button.appendChild(img);
-      
-      // Add channel name
-      const nameDiv = document.createElement('div');
-      nameDiv.textContent = name;
-      nameDiv.style.marginTop = '0.5rem';
-      nameDiv.style.fontSize = '0.85rem';
-      nameDiv.style.fontWeight = '500';
-      nameDiv.style.textAlign = 'center';
-      nameDiv.style.lineHeight = '1.2';
-      button.appendChild(nameDiv);
-        button.addEventListener('click', function() { 
-        // Hide side menu when channel is selected
-        if (isMenuVisible) {
-          toggleSideMenu();
-        }
-        
-        if (url.includes('php?m3u8') ) {
-          const iframe = document.createElement('iframe');
-          iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
-          iframe.style.width = '100%';
-          iframe.style.height = '100%';
-          iframe.style.border = 'none';
-          iframe.allowFullscreen = true;
-          iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
-          document.getElementById('videoContainer').innerHTML = '';
-          document.getElementById('videoContainer').appendChild(iframe);
-          document.getElementById('videoContainer').style.display = 'block';
-          
-          // Hide channel picker and show back button
-          document.getElementById('channelPicker').style.display = 'none';
-          document.getElementById('backButton').style.display = 'block';
-          isPickerVisible = false;
-        } else {
-          if (name === '12-kanal-il') {
-            const vlcHeaders = {
-              'User-Agent': 'VLC/3.0.11',
-              'Accept': '*/*'
-            };
-            playVideoAndAudio(
-              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/keshet_12_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
-              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/keshet_12_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000',
-              { headers: vlcHeaders }
-            );
-          } else if (name === '13-kanal-il') {
-            playVideoAndAudio(
-              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=5500000&videoId=0&renditions&fmp4&dvr=28800000',
-              'https://d1zqtf09wb8nt5.cloudfront.net/livehls/oil/freetv/live/reshet_13_hevc/live.livx/playlist.m3u8?bitrate=128000&audioId=1&lang=pol&renditions&fmp4&dvr=28800000'
-            );
-          } else if (name === '13-kanal-il1') {
-            const vlcHeaders = {
-              'User-Agent': 'VLC/3.0.11',
-              'Accept': '*/*'
-            };
-            playStream(url, vlcHeaders);
-          } else {
-            playStream(url);
-          }
+          hideLoadingMessage();
+          reject(new Error('HLS playback error: ' + (data.details || 'unknown')));
         }
       });
-      
-      return button;
-    }    function showPicker() {
-      hideLoadingMessage();
-      document.getElementById('channelPicker').style.display = 'grid';
-      document.getElementById('videoContainer').style.display = 'none';
-      document.getElementById('backButton').style.display = 'none';
-      
-      // Show side menu when going back to channels
-      if (!isMenuVisible) {
-        sideMenu.classList.remove('hidden');
-        contentArea.classList.remove('expanded');
-        isMenuVisible = true;
+    } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+      // If native HLS is supported, we cannot set custom request headers from the browser
+      if (headers) {
+        console.warn('Custom headers were requested but cannot be applied for native HLS playback in this browser. Proceeding without headers.');
       }
-      
-      isPickerVisible = true;
-    }    function hidePicker() {
-      document.getElementById('channelPicker').style.display = 'none';
-      isPickerVisible = false;
+      // If native HLS is supported
+      videoElement.src = url;
+      videoElement.addEventListener('loadedmetadata', function () {
+        videoElement.play()
+          .then(() => {
+            hideLoadingMessage();
+            resolve();
+          })
+          .catch(error => {
+            hideLoadingMessage();
+            reject(error);
+          });
+      });
+    } else {
+      hideLoadingMessage();
+      reject(new Error('HLS is not supported'));
     }
 
-    function togglePicker() {
-      if (isPickerVisible) {
-        hidePicker();
-      } else {
-        showPicker();
-      }
-    }    // Event listeners
-    document.getElementById('backButton').addEventListener('click', function() {
-      // Back button now just toggles the side menu like Hide Menu button
+    if (container) {
+      container.innerHTML = '';
+      container.appendChild(videoElement);
+      container.style.display = 'block';
+    }
+    if (channelPickerElement) {
+      channelPickerElement.style.display = 'none';
+    }
+    if (backButton) {
+      backButton.style.display = 'block';
+    }
+
+    // Show mute button and update its state to unmuted
+    updateMuteButtonVisibility(false);
+    if (muteButton) {
+      muteButton.textContent = '🔊';
+      muteButton.classList.remove('muted');
+      muteButton.title = 'Mute';
+    }
+
+    showLoadingMessage();
+    isPickerVisible = false;
+  });
+}
+
+// Function to play channel from side menu
+function playChannelFromMenu(url, name, index) {
+  // Hide side menu when channel is selected
+  if (isMenuVisible) {
+    toggleSideMenu();
+  }
+
+  // Update active channel in menu
+  document.querySelectorAll('.channel-menu-item').forEach(item => item.classList.remove('active'));
+  document.querySelector(`[data-index="${index}"]`).classList.add('active');
+
+  if (url.includes('php?m3u8Old')) {
+    const iframe = document.createElement('iframe');
+    iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = 'none';
+    iframe.allowFullscreen = true;
+    iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
+
+    document.getElementById('videoContainer').innerHTML = '';
+    document.getElementById('videoContainer').appendChild(iframe);
+    document.getElementById('videoContainer').style.display = 'block';
+
+    // Hide channel picker and show back button
+    document.getElementById('channelPicker').style.display = 'none';
+    document.getElementById('backButton').style.display = 'block';
+    isPickerVisible = false;
+  } else {
+    if (name === '12-kanal-il') {
+      const vlcHeaders = {
+        'User-Agent': 'VLC/3.0.11',
+        'Accept': '*/*'
+      };
+      playStream(
+        url,
+        { headers: vlcHeaders }
+      );
+    } else if (name === '13-kanal-il1') {
+      const vlcHeaders = {
+        'User-Agent': 'VLC/3.0.11',
+        'Accept': '*/*'
+      };
+      playStream(url, vlcHeaders);
+    } else if (name === '13-kanal-il') {
+      const vlcHeaders = {
+        'User-Agent': 'VLC/3.0.11',
+        'Accept': '*/*'
+      };
+      playStream(url, vlcHeaders);
+    } else {
+      playStream(url);
+    }
+  }
+} function createButton(name, logo, url, groupTitle) {
+  console.log("groupTitle=" + groupTitle);
+  console.log("isFilterApplied=" + isFilterApplied);
+
+  // Remove the filtering logic from createButton since it's now handled in displayChannels
+  var button = document.createElement('button');
+  button.className = 'channel-button';
+
+  // Create image element
+  const img = document.createElement('img');
+  img.src = logo;
+  img.alt = name;
+  img.onerror = function () {
+    // Fallback if image fails to load
+    this.style.display = 'none';
+    button.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 80px; background: var(--glass-bg); border-radius: 12px; margin-bottom: 0.5rem; font-size: 2rem;">📺</div>' + name;
+  };
+
+  button.appendChild(img);
+
+  // Add channel name
+  const nameDiv = document.createElement('div');
+  nameDiv.textContent = name;
+  nameDiv.style.marginTop = '0.5rem';
+  nameDiv.style.fontSize = '0.85rem';
+  nameDiv.style.fontWeight = '500';
+  nameDiv.style.textAlign = 'center';
+  nameDiv.style.lineHeight = '1.2';
+  button.appendChild(nameDiv);
+  button.addEventListener('click', function () {
+    // Hide side menu when channel is selected
+    if (isMenuVisible) {
       toggleSideMenu();
-    });function start() {
-      const channelPicker = document.getElementById('channelPicker');
-      const sideMenu = document.getElementById('sideMenu');
-      channelPicker.innerHTML = '<div class="loading">Loading channels...</div>';
-      
-      fetch('https://raw.githubusercontent.com/renanbazinin/myM3U/main/directLiveNamesDiffandEPG1.m3u')
-        .then(response => response.text())
-        .then(data => {
-          channelPicker.innerHTML = '';
+    }
 
-          // Parse channels and collect categories
-          const lines = data.split(/\r?\n/);
-          const channels = [];
-          const categories = new Set();
-          let currentChannel = {};
+    if (url.includes('php?m3u8')) {
+      const iframe = document.createElement('iframe');
+      iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = 'none';
+      iframe.allowFullscreen = true;
+      iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
+      document.getElementById('videoContainer').innerHTML = '';
+      document.getElementById('videoContainer').appendChild(iframe);
+      document.getElementById('videoContainer').style.display = 'block';
 
-          lines.forEach(line => {
-            if (line.startsWith('#EXTINF:-1')) {
-              if (currentChannel.name && currentChannel.logo && currentChannel.url) {
-                channels.push(currentChannel);
-                currentChannel = {};
-              }
-              const nameMatch = line.match(/tvg-id="([^"]+)"/);
-              const logoMatch = line.match(/tvg-logo="([^"]+)"/);
-              const groupTitleMatch = line.match(/group-title="([^"]+)"/);
-              if (nameMatch && logoMatch) {
-                currentChannel.name = nameMatch[1];
-                currentChannel.logo = logoMatch[1];
-                currentChannel.groupTitle = groupTitleMatch ? groupTitleMatch[1] : 'Other';
-                categories.add(currentChannel.groupTitle);
-              }
-            } else if (line.trim() !== '' && !line.startsWith('#')) {
-              currentChannel.url = line;
-            }
-          });
-          
-          // Add remaining channel if exists
+      // Hide channel picker and show back button
+      document.getElementById('channelPicker').style.display = 'none';
+      document.getElementById('backButton').style.display = 'block';
+      isPickerVisible = false;
+    } else {
+      if (name === '12-kanal-il') {
+        const vlcHeaders = {
+          'User-Agent': 'VLC/3.0.11',
+          'Accept': '*/*'
+        };
+        // Detect Firefox - it doesn't support HEVC codec
+        const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+        let streamUrl = url;
+        if (isFirefox) {
+          // For Firefox: remove _hevc from path and fmp4 parameter
+          streamUrl = url.replace(/_hevc/g, '').replace(/[&?]fmp4/g, '');
+        }
+        playStream(streamUrl, vlcHeaders);
+      } else if (name === '13-kanal-il') {
+        const vlcHeaders = {
+          'User-Agent': 'VLC/3.0.11',
+          'Accept': '*/*'
+        };
+        // Detect Firefox - it doesn't support HEVC codec
+        const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+        let streamUrl = url;
+        if (isFirefox) {
+          // For Firefox: remove _hevc from path and fmp4 parameter
+          streamUrl = url.replace(/_hevc/g, '').replace(/[&?]fmp4/g, '');
+        }
+        playStream(streamUrl, vlcHeaders);
+      } else if (name === '13-kanal-il1') {
+        const vlcHeaders = {
+          'User-Agent': 'VLC/3.0.11',
+          'Accept': '*/*'
+        };
+        playStream(url, vlcHeaders);
+      } else {
+        playStream(url);
+      }
+    }
+  });
+
+  return button;
+} function showPicker() {
+  hideLoadingMessage();
+  document.getElementById('channelPicker').style.display = 'grid';
+  document.getElementById('videoContainer').style.display = 'none';
+  document.getElementById('backButton').style.display = 'none';
+
+  // Show side menu when going back to channels
+  if (!isMenuVisible) {
+    sideMenu.classList.remove('hidden');
+    contentArea.classList.remove('expanded');
+    isMenuVisible = true;
+  }
+
+  isPickerVisible = true;
+} function hidePicker() {
+  document.getElementById('channelPicker').style.display = 'none';
+  isPickerVisible = false;
+}
+
+function togglePicker() {
+  if (isPickerVisible) {
+    hidePicker();
+  } else {
+    showPicker();
+  }
+}    // Event listeners
+document.getElementById('backButton').addEventListener('click', function () {
+  // Back button now just toggles the side menu like Hide Menu button
+  toggleSideMenu();
+}); function start() {
+  const channelPicker = document.getElementById('channelPicker');
+  const sideMenu = document.getElementById('sideMenu');
+  channelPicker.innerHTML = '<div class="loading">Loading channels...</div>';
+
+  fetch('https://raw.githubusercontent.com/renanbazinin/myM3U/main/directLiveNamesDiffandEPG1.m3u')
+    .then(response => response.text())
+    .then(data => {
+      channelPicker.innerHTML = '';
+
+      // Parse channels and collect categories
+      const lines = data.split(/\r?\n/);
+      const channels = [];
+      const categories = new Set();
+      let currentChannel = {};
+
+      lines.forEach(line => {
+        if (line.startsWith('#EXTINF:-1')) {
           if (currentChannel.name && currentChannel.logo && currentChannel.url) {
             channels.push(currentChannel);
+            currentChannel = {};
+          }
+          const nameMatch = line.match(/tvg-id="([^"]+)"/);
+          const logoMatch = line.match(/tvg-logo="([^"]+)"/);
+          const groupTitleMatch = line.match(/group-title="([^"]+)"/);
+          if (nameMatch && logoMatch) {
+            currentChannel.name = nameMatch[1];
+            currentChannel.logo = logoMatch[1];
+            currentChannel.groupTitle = groupTitleMatch ? groupTitleMatch[1] : 'Other';
             categories.add(currentChannel.groupTitle);
-          }          // Populate side menu with channels directly
-          const channelMenuContent = channels.map((channel, index) => 
-            `<div class="channel-menu-item" onclick="playChannelFromMenu('${channel.url}', '${channel.name}', ${index})" data-index="${index}">
+          }
+        } else if (line.trim() !== '' && !line.startsWith('#')) {
+          currentChannel.url = line;
+        }
+      });
+
+      // Add remaining channel if exists
+      if (currentChannel.name && currentChannel.logo && currentChannel.url) {
+        channels.push(currentChannel);
+        categories.add(currentChannel.groupTitle);
+      }          // Populate side menu with channels directly
+      const channelMenuContent = channels.map((channel, index) =>
+        `<div class="channel-menu-item" onclick="playChannelFromMenu('${channel.url}', '${channel.name}', ${index})" data-index="${index}">
               <img src="${channel.logo}" alt="${channel.name}" onerror="this.style.display='none'" style="width: 30px; height: 30px; border-radius: 6px; margin-right: 10px; object-fit: cover;">
               <span>${channel.name}</span>
             </div>`
-          ).join('');
-          
-          sideMenu.innerHTML = `
+      ).join('');
+
+      sideMenu.innerHTML = `
             <div style="padding: 1rem 0; border-bottom: 1px solid var(--glass-border); margin-bottom: 1rem;">
               <h3 style="margin: 0; color: var(--text-primary); font-size: 1.1rem; font-weight: 600;">Channels</h3>
             </div>
@@ -613,151 +624,151 @@ let isPickerVisible = true;
               }
             </style>
           `;// Store channels globally for filtering
-          window.allChannels = channels;
-          
-          // Display channels based on filter
-          displayChannels(channels);
-          
-          // Auto-play first channel if supported, otherwise show menu
-          if (channels.length > 0) {
-            const firstChannel = channels[0];
-            // Skip iframe-based channels or special iframe channels for auto-play
-            if (!firstChannel.url.includes('php?m3u8') && firstChannel.name !== '12-kanal-il') {
-              // Hide side menu automatically
-              if (isMenuVisible) toggleSideMenu();
-              // Attempt to play via playStream, fallback to picker on failure
-              playStream(firstChannel.url)
-                .then(() => {
-                  // Mark first channel as active
-                  const firstMenuItem = document.querySelector('[data-index="0"]');
-                  if (firstMenuItem) firstMenuItem.classList.add('active');
-                })
-                .catch(err => {
-                  console.error('Auto-play failed:', err);
-                  showPicker();
-                });
-            } else {
-              // Cannot auto-play iframe streams; show picker
+      window.allChannels = channels;
+
+      // Display channels based on filter
+      displayChannels(channels);
+
+      // Auto-play first channel if supported, otherwise show menu
+      if (channels.length > 0) {
+        const firstChannel = channels[0];
+        // Skip iframe-based channels or special iframe channels for auto-play
+        if (!firstChannel.url.includes('php?m3u8') && firstChannel.name !== '12-kanal-il') {
+          // Hide side menu automatically
+          if (isMenuVisible) toggleSideMenu();
+          // Attempt to play via playStream, fallback to picker on failure
+          playStream(firstChannel.url)
+            .then(() => {
+              // Mark first channel as active
+              const firstMenuItem = document.querySelector('[data-index="0"]');
+              if (firstMenuItem) firstMenuItem.classList.add('active');
+            })
+            .catch(err => {
+              console.error('Auto-play failed:', err);
               showPicker();
-            }
-          }
-        })
-        .catch(error => {
-          console.error('Error loading channels:', error);
-          channelPicker.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 2rem;">Failed to load channels. Please try again.</div>';
-        });
-    }
-
-    function displayChannels(channelsToShow) {
-      const channelPicker = document.getElementById('channelPicker');
-      channelPicker.innerHTML = '';
-
-      if (isFilterApplied && channelsToShow === window.allChannels) {
-        // Show only Israel channels initially
-        channelsToShow = window.allChannels.filter(channel => channel.groupTitle === 'Israel');
-        
-        // Add "Show US Channels" button
-        const showUSChannelsButton = document.createElement('button');
-        showUSChannelsButton.id = 'showUSChannels';
-        showUSChannelsButton.className = 'channel-button';
-        
-        const flagImg = document.createElement('img');
-        flagImg.src = 'https://i.imgur.com/lUKWqOA.png';
-        flagImg.style.height = '40px';
-        flagImg.style.marginBottom = '0.5rem';
-        
-        const textDiv = document.createElement('div');
-        textDiv.textContent = 'Show US Channels';
-        textDiv.style.fontSize = '0.85rem';
-        textDiv.style.fontWeight = '600';
-        
-        showUSChannelsButton.appendChild(flagImg);
-        showUSChannelsButton.appendChild(textDiv);
-        channelPicker.appendChild(showUSChannelsButton);
-        
-        showUSChannelsButton.addEventListener('click', function() {
-          isFilterApplied = false;
-          displayChannels(window.allChannels);
-        });
-      }
-
-      channelsToShow.forEach(channel => {
-        const button = createButton(channel.name, channel.logo, channel.url, channel.groupTitle);
-        if (button) {
-          channelPicker.appendChild(button);
-        }
-      });
-    }    window.onload = function() {
-      start();
-    };
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') {
-        if (!isPickerVisible) {
+            });
+        } else {
+          // Cannot auto-play iframe streams; show picker
           showPicker();
         }
-      } else if (e.key === 'h' || e.key === 'H') {
-        togglePicker();
-      } else if (e.key >= '0' && e.key <= '9') {
-        handleNumericInput(e.key);
       }
+    })
+    .catch(error => {
+      console.error('Error loading channels:', error);
+      channelPicker.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 2rem;">Failed to load channels. Please try again.</div>';
     });
+}
 
-    // New functions for two-digit channel input
-    function handleNumericInput(digit) {
-    if (!channelInputDisplay) return;
+function displayChannels(channelsToShow) {
+  const channelPicker = document.getElementById('channelPicker');
+  channelPicker.innerHTML = '';
 
-    if (channelInputTimer) {
-        clearTimeout(channelInputTimer);
+  if (isFilterApplied && channelsToShow === window.allChannels) {
+    // Show only Israel channels initially
+    channelsToShow = window.allChannels.filter(channel => channel.groupTitle === 'Israel');
+
+    // Add "Show US Channels" button
+    const showUSChannelsButton = document.createElement('button');
+    showUSChannelsButton.id = 'showUSChannels';
+    showUSChannelsButton.className = 'channel-button';
+
+    const flagImg = document.createElement('img');
+    flagImg.src = 'https://i.imgur.com/lUKWqOA.png';
+    flagImg.style.height = '40px';
+    flagImg.style.marginBottom = '0.5rem';
+
+    const textDiv = document.createElement('div');
+    textDiv.textContent = 'Show US Channels';
+    textDiv.style.fontSize = '0.85rem';
+    textDiv.style.fontWeight = '600';
+
+    showUSChannelsButton.appendChild(flagImg);
+    showUSChannelsButton.appendChild(textDiv);
+    channelPicker.appendChild(showUSChannelsButton);
+
+    showUSChannelsButton.addEventListener('click', function () {
+      isFilterApplied = false;
+      displayChannels(window.allChannels);
+    });
+  }
+
+  channelsToShow.forEach(channel => {
+    const button = createButton(channel.name, channel.logo, channel.url, channel.groupTitle);
+    if (button) {
+      channelPicker.appendChild(button);
     }
+  });
+} window.onload = function () {
+  start();
+};
 
-    channelInput.push(digit);
-    updateChannelInputDisplay();
+// Keyboard shortcuts
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') {
+    if (!isPickerVisible) {
+      showPicker();
+    }
+  } else if (e.key === 'h' || e.key === 'H') {
+    togglePicker();
+  } else if (e.key >= '0' && e.key <= '9') {
+    handleNumericInput(e.key);
+  }
+});
 
-    if (channelInput.length === 1) {
-        channelInputTimer = setTimeout(() => {
-            const channelNumber = parseInt(channelInput[0]);
-            if (channelNumber > 0) {
-                const channelIndex = channelNumber - 1;
-                if (window.allChannels && window.allChannels[channelIndex]) {
-                    const channel = window.allChannels[channelIndex];
-                    playChannelFromMenu(channel.url, channel.name, channelIndex);
-                }
-            }
-            resetChannelInput();
-        }, 1500); // 1.5-second wait
-    } else if (channelInput.length === 2) {
-        const channelNumber = parseInt(channelInput.join(''));
+// New functions for two-digit channel input
+function handleNumericInput(digit) {
+  if (!channelInputDisplay) return;
+
+  if (channelInputTimer) {
+    clearTimeout(channelInputTimer);
+  }
+
+  channelInput.push(digit);
+  updateChannelInputDisplay();
+
+  if (channelInput.length === 1) {
+    channelInputTimer = setTimeout(() => {
+      const channelNumber = parseInt(channelInput[0]);
+      if (channelNumber > 0) {
         const channelIndex = channelNumber - 1;
-
         if (window.allChannels && window.allChannels[channelIndex]) {
-            const channel = window.allChannels[channelIndex];
-            playChannelFromMenu(channel.url, channel.name, channelIndex);
+          const channel = window.allChannels[channelIndex];
+          playChannelFromMenu(channel.url, channel.name, channelIndex);
         }
-        setTimeout(resetChannelInput, 500);
+      }
+      resetChannelInput();
+    }, 1500); // 1.5-second wait
+  } else if (channelInput.length === 2) {
+    const channelNumber = parseInt(channelInput.join(''));
+    const channelIndex = channelNumber - 1;
+
+    if (window.allChannels && window.allChannels[channelIndex]) {
+      const channel = window.allChannels[channelIndex];
+      playChannelFromMenu(channel.url, channel.name, channelIndex);
     }
+    setTimeout(resetChannelInput, 500);
+  }
 }
 
 function updateChannelInputDisplay() {
-    if (!channelInputDisplay) return;
-    channelInputDisplay.classList.remove('hidden');
-    channelInputSpans[0].textContent = channelInput[0] || '_';
-    channelInputSpans[1].textContent = channelInput[1] || '_';
+  if (!channelInputDisplay) return;
+  channelInputDisplay.classList.remove('hidden');
+  channelInputSpans[0].textContent = channelInput[0] || '_';
+  channelInputSpans[1].textContent = channelInput[1] || '_';
 }
 
 function resetChannelInput() {
-    if (!channelInputDisplay) return;
-    channelInput = [];
-    channelInputDisplay.classList.add('hidden');
-    if (channelInputSpans.length > 1) {
-        channelInputSpans[0].textContent = '_';
-        channelInputSpans[1].textContent = '_';
-    }
-    if (channelInputTimer) {
-        clearTimeout(channelInputTimer);
-        channelInputTimer = null;
-    }
+  if (!channelInputDisplay) return;
+  channelInput = [];
+  channelInputDisplay.classList.add('hidden');
+  if (channelInputSpans.length > 1) {
+    channelInputSpans[0].textContent = '_';
+    channelInputSpans[1].textContent = '_';
+  }
+  if (channelInputTimer) {
+    clearTimeout(channelInputTimer);
+    channelInputTimer = null;
+  }
 }
 
 // New function to play separate video and audio streams for specific channel
@@ -814,14 +825,14 @@ function playVideoAndAudio(videoUrl, audioUrl, options = null) {
       clearAudioVideoSyncInterval();
 
       if (hlsVideo) {
-        try { hlsVideo.destroy(); } catch (_error) {}
+        try { hlsVideo.destroy(); } catch (_error) { }
         if (currentHlsVideoInstance === hlsVideo) {
           currentHlsVideoInstance = null;
         }
         hlsVideo = null;
       }
       if (hlsAudio) {
-        try { hlsAudio.destroy(); } catch (_error) {}
+        try { hlsAudio.destroy(); } catch (_error) { }
         if (currentHlsAudioInstance === hlsAudio) {
           currentHlsAudioInstance = null;
         }
@@ -952,8 +963,8 @@ function playVideoAndAudio(videoUrl, audioUrl, options = null) {
 
       if (target !== null) {
         const clampedTarget = Math.max(target, 0);
-        try { videoElement.currentTime = clampedTarget; } catch (_error) {}
-        try { audioElement.currentTime = clampedTarget; } catch (_error) {}
+        try { videoElement.currentTime = clampedTarget; } catch (_error) { }
+        try { audioElement.currentTime = clampedTarget; } catch (_error) { }
       }
     };
 
@@ -1074,7 +1085,7 @@ function playVideoAndAudio(videoUrl, audioUrl, options = null) {
 
       hlsVideo = new Hls(hlsConfig);
       hlsAudio = new Hls(hlsConfig);
-      
+
       // Store HLS instances globally for cleanup
       currentHlsVideoInstance = hlsVideo;
       currentHlsAudioInstance = hlsAudio;
