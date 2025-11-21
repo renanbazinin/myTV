@@ -404,10 +404,14 @@ function playChannelFromMenu(url, name, index) {
         'User-Agent': 'VLC/3.0.11',
         'Accept': '*/*'
       };
-      playStream(
-        url,
-        { headers: vlcHeaders }
-      );
+      // Detect Firefox - it doesn't support HEVC codec
+      const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+      let streamUrl = url;
+      if (isFirefox) {
+        // For Firefox: remove _hevc from path and fmp4 parameter
+        streamUrl = url.replace(/_hevc/g, '').replace(/[&?]fmp4/g, '');
+      }
+      playStream(streamUrl, vlcHeaders);
     } else if (name === '13-kanal-il1') {
       const vlcHeaders = {
         'User-Agent': 'VLC/3.0.11',
@@ -419,7 +423,14 @@ function playChannelFromMenu(url, name, index) {
         'User-Agent': 'VLC/3.0.11',
         'Accept': '*/*'
       };
-      playStream(url, vlcHeaders);
+      // Detect Firefox - it doesn't support HEVC codec
+      const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+      let streamUrl = url;
+      if (isFirefox) {
+        // For Firefox: remove _hevc from path and fmp4 parameter
+        streamUrl = url.replace(/_hevc/g, '').replace(/[&?]fmp4/g, '');
+      }
+      playStream(streamUrl, vlcHeaders);
     } else {
       playStream(url);
     }
