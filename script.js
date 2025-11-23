@@ -8,6 +8,7 @@ let audioVideoSyncInterval = null;
 let currentHlsVideoInstance = null;
 let currentHlsAudioInstance = null;
 let loadingStatusElement = null;
+let memoryCheckInterval = null;
 
 function showLoadingMessage(message = 'Loading buffer...') {
   const container = document.getElementById('videoContainer');
@@ -123,8 +124,64 @@ function normalizePlaybackOptions(options) {
 
 function clearAudioVideoSyncInterval() {
   if (audioVideoSyncInterval) {
+    ;
     clearInterval(audioVideoSyncInterval);
     audioVideoSyncInterval = null;
+  }
+}
+
+function startMemoryMonitor() {
+  // Only in Chrome/Edge with memory API
+  if (!performance.memory) return;
+
+  clearMemoryMonitor();
+
+  memoryCheckInterval = setInterval(() => {
+    const memoryMB = performance.memory.usedJSHeapSize / (1024 * 1024);
+    const limitMB = performance.memory.jsHeapSizeLimit / (1024 * 1024);
+    const usagePercent = (memoryMB / limitMB) * 100;
+
+    console.log(`Memory: ${memoryMB.toFixed(0)}MB / ${limitMB.toFixed(0)}MB (${usagePercent.toFixed(1)}%)`);
+
+    // If memory usage exceeds 80%, force buffer cleanup
+    if (usagePercent > 80) {
+      console.warn('High memory usage detected! Triggering buffer cleanup...');
+
+      // Force HLS to drop old buffers
+      if (currentHlsVideoInstance) {
+        try {
+          currentHlsVideoInstance.trigger(Hls.Events.BUFFER_FLUSHING, {
+            startOffset: 0,
+            endOffset: Number.POSITIVE_INFINITY
+          });
+        } catch (e) {
+          console.warn('Failed to flush video buffer:', e);
+        }
+      }
+
+      if (currentHlsAudioInstance) {
+        try {
+          currentHlsAudioInstance.trigger(Hls.Events.BUFFER_FLUSHING, {
+            startOffset: 0,
+            endOffset: Number.POSITIVE_INFINITY
+          });
+        } catch (e) {
+          console.warn('Failed to flush audio buffer:', e);
+        }
+      }
+    }
+
+    // If still > 90%, show warning to user
+    if (usagePercent > 90) {
+      showLoadingMessage('⚠️ High memory usage - Consider refreshing page');
+    }
+  }, 30000); // Check every 30 seconds
+}
+
+function clearMemoryMonitor() {
+  if (memoryCheckInterval) {
+    clearInterval(memoryCheckInterval);
+    memoryCheckInterval = null;
   }
 }
 
@@ -180,26 +237,41 @@ function stopCurrentVideoElement() {
   currentVideoElement = null;
 }
 
+// Helper function to properly cleanup HLS instances
+function cleanupHlsInstance(hlsInstance) {
+  if (!hlsInstance) return;
+
+  try {
+    // Remove all event listeners first
+    hlsInstance.off(Hls.Events.ERROR);
+    hlsInstance.off(Hls.Events.MANIFEST_PARSED);
+    hlsInstance.off(Hls.Events.FRAG_LOADED);
+
+    // Detach media before destroying
+    if (hlsInstance.media) {
+      hlsInstance.detachMedia();
+    }
+
+    // Destroy instance (cleans up internal buffers)
+    hlsInstance.destroy();
+  } catch (error) {
+    console.warn('Failed to cleanup HLS instance:', error);
+  }
+}
+
 function cleanupAllMedia() {
   hideLoadingMessage();
   clearAudioVideoSyncInterval();
+  clearMemoryMonitor();
 
-  // Destroy HLS instances
+  // Destroy HLS instances with proper cleanup
   if (currentHlsVideoInstance) {
-    try {
-      currentHlsVideoInstance.destroy();
-    } catch (error) {
-      console.warn('Failed to destroy HLS video instance:', error);
-    }
+    cleanupHlsInstance(currentHlsVideoInstance);
     currentHlsVideoInstance = null;
   }
 
   if (currentHlsAudioInstance) {
-    try {
-      currentHlsAudioInstance.destroy();
-    } catch (error) {
-      console.warn('Failed to destroy HLS audio instance:', error);
-    }
+    cleanupHlsInstance(currentHlsAudioInstance);
     currentHlsAudioInstance = null;
   }
 
@@ -259,7 +331,7 @@ function toggleMute() {
 // Add event listener for mute button
 document.getElementById('muteButton').addEventListener('click', toggleMute);
 
-function playStream(url, headers = null) {
+function playStream(url) {
   cleanupAllMedia();
   return new Promise((resolve, reject) => {
     const videoElement = document.createElement('video');
@@ -280,21 +352,34 @@ function playStream(url, headers = null) {
 
     // Check if HLS.js is supported
     if (Hls.isSupported()) {
-      // If headers are provided, configure Hls.js XHR setup so requests include them
-      const hlsConfig = {};
-      if (headers && typeof headers === 'object') {
-        hlsConfig.xhrSetup = function (xhr, url) {
-          try {
-            for (const key in headers) {
-              if (Object.prototype.hasOwnProperty.call(headers, key)) {
-                xhr.setRequestHeader(key, headers[key]);
-              }
-            }
-          } catch (e) {
-            console.warn('Failed to set custom headers on XHR:', e);
-          }
-        };
-      }
+      // Configure HLS with aggressive buffer limits to prevent memory leaks
+      const hlsConfig = {
+        enableWorker: true,
+        lowLatencyMode: false,
+
+        // Live stream synchronization
+        liveSyncDuration: 6,
+        liveMaxLatencyDuration: 18,
+
+        // CRITICAL: Buffer management to prevent memory leaks
+        maxBufferLength: 30,              // Keep max 30 seconds buffered
+        maxMaxBufferLength: 60,           // Hard limit: never exceed 60 seconds
+        backBufferLength: 10,             // Remove fragments >10sec behind playhead
+
+        // Fragment loading optimization
+        maxBufferSize: 60 * 1000 * 1000,  // 60 MB max buffer size
+        maxBufferHole: 0.5,
+
+        // Reduce manifest polling
+        manifestLoadingTimeOut: 10000,
+        manifestLoadingMaxRetry: 3,
+        levelLoadingTimeOut: 10000,
+
+        // Fragment retry limits
+        fragLoadingTimeOut: 20000,
+        fragLoadingMaxRetry: 3
+      };
+
       const hls = new Hls(hlsConfig);
       currentHlsVideoInstance = hls;
       hls.loadSource(url);
@@ -303,6 +388,7 @@ function playStream(url, headers = null) {
         videoElement.play()
           .then(() => {
             hideLoadingMessage();
+            startMemoryMonitor();
             resolve();
           })
           .catch(error => {
@@ -312,9 +398,7 @@ function playStream(url, headers = null) {
       });
       hls.on(Hls.Events.ERROR, function (event, data) {
         if (data.fatal) {
-          try {
-            hls.destroy();
-          } catch (e) { }
+          cleanupHlsInstance(hls);
           if (currentHlsVideoInstance === hls) {
             currentHlsVideoInstance = null;
           }
@@ -323,10 +407,6 @@ function playStream(url, headers = null) {
         }
       });
     } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-      // If native HLS is supported, we cannot set custom request headers from the browser
-      if (headers) {
-        console.warn('Custom headers were requested but cannot be applied for native HLS playback in this browser. Proceeding without headers.');
-      }
       // If native HLS is supported
       videoElement.src = url;
       videoElement.addEventListener('loadedmetadata', function () {
@@ -488,10 +568,6 @@ function playChannelFromMenu(url, name, index) {
       isPickerVisible = false;
     } else {
       if (name === '12-kanal-il') {
-        const vlcHeaders = {
-          'User-Agent': 'VLC/3.0.11',
-          'Accept': '*/*'
-        };
         // Detect Firefox - it doesn't support HEVC codec
         const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
         let streamUrl = url;
@@ -499,12 +575,8 @@ function playChannelFromMenu(url, name, index) {
           // For Firefox: remove _hevc from path and fmp4 parameter
           streamUrl = url.replace(/_hevc/g, '').replace(/[&?]fmp4/g, '');
         }
-        playStream(streamUrl, vlcHeaders);
+        playStream(streamUrl);
       } else if (name === '13-kanal-il') {
-        const vlcHeaders = {
-          'User-Agent': 'VLC/3.0.11',
-          'Accept': '*/*'
-        };
         // Detect Firefox - it doesn't support HEVC codec
         const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
         let streamUrl = url;
@@ -512,13 +584,7 @@ function playChannelFromMenu(url, name, index) {
           // For Firefox: remove _hevc from path and fmp4 parameter
           streamUrl = url.replace(/_hevc/g, '').replace(/[&?]fmp4/g, '');
         }
-        playStream(streamUrl, vlcHeaders);
-      } else if (name === '13-kanal-il1') {
-        const vlcHeaders = {
-          'User-Agent': 'VLC/3.0.11',
-          'Accept': '*/*'
-        };
-        playStream(url, vlcHeaders);
+        playStream(streamUrl);
       } else {
         playStream(url);
       }
