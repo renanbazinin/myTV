@@ -147,24 +147,30 @@ function startMemoryMonitor() {
     if (usagePercent > 80) {
       console.warn('High memory usage detected! Triggering buffer cleanup...');
 
-      // Force HLS to drop old buffers
-      if (currentHlsVideoInstance) {
+      // Force HLS to drop old buffers (back buffer only)
+      if (currentHlsVideoInstance && currentVideoElement) {
         try {
-          currentHlsVideoInstance.trigger(Hls.Events.BUFFER_FLUSHING, {
-            startOffset: 0,
-            endOffset: Number.POSITIVE_INFINITY
-          });
+          const keepPos = Math.max(0, currentVideoElement.currentTime - 30);
+          if (keepPos > 0) {
+            currentHlsVideoInstance.trigger(Hls.Events.BUFFER_FLUSHING, {
+              startOffset: 0,
+              endOffset: keepPos
+            });
+          }
         } catch (e) {
           console.warn('Failed to flush video buffer:', e);
         }
       }
 
-      if (currentHlsAudioInstance) {
+      if (currentHlsAudioInstance && currentAudioElement) {
         try {
-          currentHlsAudioInstance.trigger(Hls.Events.BUFFER_FLUSHING, {
-            startOffset: 0,
-            endOffset: Number.POSITIVE_INFINITY
-          });
+          const keepPos = Math.max(0, currentAudioElement.currentTime - 30);
+          if (keepPos > 0) {
+            currentHlsAudioInstance.trigger(Hls.Events.BUFFER_FLUSHING, {
+              startOffset: 0,
+              endOffset: keepPos
+            });
+          }
         } catch (e) {
           console.warn('Failed to flush audio buffer:', e);
         }
@@ -358,16 +364,16 @@ function playStream(url) {
         lowLatencyMode: false,
 
         // Live stream synchronization
-        liveSyncDuration: 6,
-        liveMaxLatencyDuration: 18,
+        liveSyncDuration: 25,
+        liveMaxLatencyDuration: 50,
 
         // CRITICAL: Buffer management to prevent memory leaks
-        maxBufferLength: 30,              // Keep max 30 seconds buffered
-        maxMaxBufferLength: 60,           // Hard limit: never exceed 60 seconds
-        backBufferLength: 10,             // Remove fragments >10sec behind playhead
+        maxBufferLength: 60,              // Keep max 60 seconds buffered
+        maxMaxBufferLength: 120,          // Hard limit: never exceed 120 seconds
+        backBufferLength: 30,             // Remove fragments >30sec behind playhead
 
         // Fragment loading optimization
-        maxBufferSize: 60 * 1000 * 1000,  // 60 MB max buffer size
+        maxBufferSize: 250 * 1000 * 1000,  // 250 MB max buffer size
         maxBufferHole: 0.5,
 
         // Reduce manifest polling
@@ -398,12 +404,24 @@ function playStream(url) {
       });
       hls.on(Hls.Events.ERROR, function (event, data) {
         if (data.fatal) {
-          cleanupHlsInstance(hls);
-          if (currentHlsVideoInstance === hls) {
-            currentHlsVideoInstance = null;
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.warn('Network error encountered, trying to recover...');
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.warn('Media error encountered, trying to recover...');
+              hls.recoverMediaError();
+              break;
+            default:
+              cleanupHlsInstance(hls);
+              if (currentHlsVideoInstance === hls) {
+                currentHlsVideoInstance = null;
+              }
+              hideLoadingMessage();
+              reject(new Error('HLS playback error: ' + (data.details || 'unknown')));
+              break;
           }
-          hideLoadingMessage();
-          reject(new Error('HLS playback error: ' + (data.details || 'unknown')));
         }
       });
     } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
@@ -1140,9 +1158,12 @@ function playVideoAndAudio(videoUrl, audioUrl, options = null) {
       const hlsConfig = {
         enableWorker: true,
         lowLatencyMode: false,
-        liveSyncDuration: 6,
-        liveMaxLatencyDuration: 18,
-        backBufferLength: 0
+        liveSyncDuration: 12,
+        liveMaxLatencyDuration: 30,
+        backBufferLength: 30,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 120,
+        maxBufferSize: 150 * 1000 * 1000 // 150 MB per stream
       };
 
       // Add headers support if provided
