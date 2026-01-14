@@ -6,7 +6,7 @@
  * @param {string} name - Channel name
  * @param {number} index - Channel index
  */
-function playChannelFromMenu(url, name, index) {
+async function playChannelFromMenu(url, name, index) {
     // Hide side menu when channel is selected
     if (isMenuVisible) {
         toggleSideMenu();
@@ -35,6 +35,21 @@ function playChannelFromMenu(url, name, index) {
         document.getElementById('channelPicker').style.display = 'none';
         document.getElementById('backButton').style.display = 'block';
         isPickerVisible = false;
+    } else if (typeof needsHelperFetcher === 'function' && needsHelperFetcher(name)) {
+        // Special channel that needs dynamic URL fetching (e.g., i24-il for Hebrew stream)
+        console.log(`[Channels] Using helperFetcher for: ${name}`);
+        try {
+            const dynamicUrl = await fetchStreamUrl(name);
+            if (dynamicUrl) {
+                playStream(dynamicUrl);
+            } else {
+                console.error(`[Channels] Failed to get stream URL for ${name}`);
+                alert(`Failed to load ${name}. Please try again.`);
+            }
+        } catch (error) {
+            console.error(`[Channels] Error fetching ${name}:`, error);
+            alert(`Error loading ${name}: ${error.message}`);
+        }
     } else {
         if (name === '12-kanal-il') {
             const vlcHeaders = {
@@ -104,7 +119,7 @@ function createButton(name, logo, url, groupTitle) {
     nameDiv.style.lineHeight = '1.2';
     button.appendChild(nameDiv);
 
-    button.addEventListener('click', function () {
+    button.addEventListener('click', async function () {
         if (isMenuVisible) {
             toggleSideMenu();
         }
@@ -124,6 +139,21 @@ function createButton(name, logo, url, groupTitle) {
             document.getElementById('channelPicker').style.display = 'none';
             document.getElementById('backButton').style.display = 'block';
             isPickerVisible = false;
+        } else if (typeof needsHelperFetcher === 'function' && needsHelperFetcher(name)) {
+            // Special channel that needs dynamic URL fetching (e.g., i24-il)
+            console.log(`[Channels] Using helperFetcher for: ${name}`);
+            try {
+                const dynamicUrl = await fetchStreamUrl(name);
+                if (dynamicUrl) {
+                    playStream(dynamicUrl);
+                } else {
+                    console.error(`[Channels] Failed to get stream URL for ${name}`);
+                    alert(`Failed to load ${name}. Please try again.`);
+                }
+            } catch (error) {
+                console.error(`[Channels] Error fetching ${name}:`, error);
+                alert(`Error loading ${name}: ${error.message}`);
+            }
         } else {
             if (name === '12-kanal-il') {
                 const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
