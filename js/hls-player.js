@@ -175,6 +175,16 @@ function cleanupAllMedia() {
 
     stopCurrentAudioElement();
     stopCurrentVideoElement();
+
+    // Remove any iframes (e.g., mako embed) from the video container
+    const container = document.getElementById('videoContainer');
+    if (container) {
+        const iframes = container.querySelectorAll('iframe');
+        iframes.forEach(iframe => {
+            iframe.src = '';
+            iframe.remove();
+        });
+    }
 }
 
 /**

@@ -57,7 +57,7 @@ function toggleMute() {
  * Show channel picker and hide video
  */
 function showPicker() {
-    hideLoadingMessage();
+    cleanupAllMedia();
     document.getElementById('channelPicker').style.display = 'grid';
     document.getElementById('videoContainer').style.display = 'none';
     document.getElementById('backButton').style.display = 'none';

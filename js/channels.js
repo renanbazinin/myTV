@@ -12,6 +12,9 @@ async function playChannelFromMenu(url, name, index) {
         toggleSideMenu();
     }
 
+    // Stop any currently playing stream before switching
+    cleanupAllMedia();
+
     // Update active channel in menu
     document.querySelectorAll('.channel-menu-item').forEach(item => item.classList.remove('active'));
     const activeItem = document.querySelector(`[data-index="${index}"]`);
@@ -123,6 +126,9 @@ function createButton(name, logo, url, groupTitle) {
         if (isMenuVisible) {
             toggleSideMenu();
         }
+
+        // Stop any currently playing stream before switching
+        cleanupAllMedia();
 
         if (url.includes('php?m3u8')) {
             const iframe = document.createElement('iframe');
@@ -311,24 +317,8 @@ function start() {
             // Display channels based on filter
             displayChannels(channels);
 
-            // Auto-play first channel if supported
-            if (channels.length > 0) {
-                const firstChannel = channels[0];
-                if (!firstChannel.url.includes('php?m3u8') && firstChannel.name !== '12-kanal-il') {
-                    if (isMenuVisible) toggleSideMenu();
-                    playStream(firstChannel.url)
-                        .then(() => {
-                            const firstMenuItem = document.querySelector('[data-index="0"]');
-                            if (firstMenuItem) firstMenuItem.classList.add('active');
-                        })
-                        .catch(err => {
-                            console.error('Auto-play failed:', err);
-                            showPicker();
-                        });
-                } else {
-                    showPicker();
-                }
-            }
+            // Show channel picker (no auto-play)
+            showPicker();
         })
         .catch(error => {
             console.error('Error loading channels:', error);
