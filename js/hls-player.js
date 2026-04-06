@@ -199,8 +199,8 @@ function playStream(url) {
         videoElement.className = 'video-element';
         videoElement.controls = true;
         videoElement.autoplay = true;
-        videoElement.muted = false;
-        isMuted = false;
+        videoElement.muted = isMuted;
+        videoElement.volume = currentVolume;
 
         currentVideoElement = videoElement;
         currentAudioElement = null;
@@ -299,11 +299,7 @@ function playStream(url) {
         }
 
         updateMuteButtonVisibility(false);
-        if (muteButton) {
-            muteButton.textContent = '🔊';
-            muteButton.classList.remove('muted');
-            muteButton.title = 'Mute';
-        }
+        updateMuteButtonIcon();
 
         showLoadingMessage();
         isPickerVisible = false;
@@ -335,8 +331,8 @@ function playVideoAndAudio(videoUrl, audioUrl, options = null) {
         videoElement.controls = true;
         videoElement.autoplay = false;
         videoElement.preload = 'auto';
-        videoElement.muted = false;
-        videoElement.volume = 1;
+        videoElement.muted = isMuted;
+        videoElement.volume = currentVolume;
         videoElement.setAttribute('playsinline', '');
         videoElement.setAttribute('webkit-playsinline', '');
 
@@ -344,12 +340,10 @@ function playVideoAndAudio(videoUrl, audioUrl, options = null) {
         audioElement.style.display = 'none';
         audioElement.autoplay = false;
         audioElement.preload = 'auto';
-        audioElement.muted = false;
-        audioElement.volume = 1;
+        audioElement.muted = isMuted;
+        audioElement.volume = currentVolume;
         audioElement.setAttribute('playsinline', '');
         audioElement.setAttribute('webkit-playsinline', '');
-
-        isMuted = false;
         currentVideoElement = videoElement;
         currentAudioElement = audioElement;
 
@@ -507,20 +501,6 @@ function playVideoAndAudio(videoUrl, audioUrl, options = null) {
             }
         };
 
-        const updateMuteButton = () => {
-            if (!muteButton) return;
-
-            if (isMuted) {
-                muteButton.textContent = '🔇';
-                muteButton.classList.add('muted');
-                muteButton.title = 'Unmute';
-            } else {
-                muteButton.textContent = '🔊';
-                muteButton.classList.remove('muted');
-                muteButton.title = 'Mute';
-            }
-        };
-
         const setupUi = () => {
             container.innerHTML = '';
             container.appendChild(videoElement);
@@ -536,7 +516,7 @@ function playVideoAndAudio(videoUrl, audioUrl, options = null) {
             }
 
             updateMuteButtonVisibility(false);
-            updateMuteButton();
+            updateMuteButtonIcon();
             showLoadingMessage(loadingMessageText);
         };
 

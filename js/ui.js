@@ -27,29 +27,75 @@ function updateMuteButtonVisibility(hidden) {
 }
 
 /**
+ * Update mute button icon to reflect current state
+ */
+function updateMuteButtonIcon() {
+    const muteButton = document.getElementById('muteButton');
+    if (!muteButton) return;
+    if (isMuted) {
+        muteButton.textContent = '🔇';
+        muteButton.classList.add('muted');
+        muteButton.title = 'Unmute';
+    } else {
+        muteButton.textContent = '🔊';
+        muteButton.classList.remove('muted');
+        muteButton.title = 'Mute';
+    }
+}
+
+/**
+ * Apply current volume and mute state to all active media elements
+ */
+function applyVolumeToMedia() {
+    if (currentVideoElement) {
+        currentVideoElement.volume = currentVolume;
+        currentVideoElement.muted = isMuted;
+    }
+    if (currentAudioElement) {
+        currentAudioElement.volume = currentVolume;
+        currentAudioElement.muted = isMuted;
+    }
+}
+
+/**
+ * Set volume from slider value (0-100)
+ */
+function setVolume(value) {
+    currentVolume = value / 100;
+    localStorage.setItem('myTV_volume', String(currentVolume));
+
+    if (value === 0 && !isMuted) {
+        isMuted = true;
+        localStorage.setItem('myTV_isMuted', 'true');
+        updateMuteButtonIcon();
+    } else if (value > 0 && isMuted) {
+        isMuted = false;
+        localStorage.setItem('myTV_isMuted', 'false');
+        updateMuteButtonIcon();
+    }
+
+    applyVolumeToMedia();
+}
+
+/**
  * Toggle mute state for video and audio
  */
 function toggleMute() {
-    const muteButton = document.getElementById('muteButton');
+    const volumeSlider = document.getElementById('volumeSlider');
 
     if (currentVideoElement || currentAudioElement) {
         isMuted = !isMuted;
-        if (currentVideoElement) {
-            currentVideoElement.muted = isMuted;
-        }
-        if (currentAudioElement) {
-            currentAudioElement.muted = isMuted;
-        }
+        localStorage.setItem('myTV_isMuted', String(isMuted));
 
         if (isMuted) {
-            muteButton.textContent = '🔇';
-            muteButton.classList.add('muted');
-            muteButton.title = 'Unmute';
+            if (volumeSlider) volumeSlider.value = 0;
         } else {
-            muteButton.textContent = '🔊';
-            muteButton.classList.remove('muted');
-            muteButton.title = 'Mute';
+            if (currentVolume === 0) currentVolume = 1;
+            if (volumeSlider) volumeSlider.value = currentVolume * 100;
         }
+
+        applyVolumeToMedia();
+        updateMuteButtonIcon();
     }
 }
 
@@ -100,6 +146,18 @@ function initUiEventListeners() {
     if (muteButton) {
         muteButton.addEventListener('click', toggleMute);
     }
+
+    // Volume slider handler
+    const volumeSlider = document.getElementById('volumeSlider');
+    if (volumeSlider) {
+        volumeSlider.value = isMuted ? 0 : currentVolume * 100;
+        volumeSlider.addEventListener('input', function () {
+            setVolume(parseInt(this.value, 10));
+        });
+    }
+
+    // Set initial mute button icon from stored state
+    updateMuteButtonIcon();
 
     // Back button click handler
     const backButton = document.getElementById('backButton');

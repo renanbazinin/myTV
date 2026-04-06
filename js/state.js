@@ -4,7 +4,8 @@
 let isPickerVisible = true;
 let isMenuVisible = true;
 let isFilterApplied = true;
-let isMuted = true; // Start muted for autoplay compatibility
+let isMuted = localStorage.getItem('myTV_isMuted') !== 'false'; // Default muted for autoplay compatibility
+let currentVolume = localStorage.getItem('myTV_volume') !== null ? parseFloat(localStorage.getItem('myTV_volume')) : 0.6; // Default 60% volume
 
 // Media element references
 let currentVideoElement = null;
