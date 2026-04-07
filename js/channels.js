@@ -7,6 +7,12 @@
  * @param {number} index - Channel index
  */
 async function playChannelFromMenu(url, name, index) {
+    // Track channel navigation
+    if (currentChannelIndex >= 0) {
+        previousChannelIndex = currentChannelIndex;
+    }
+    currentChannelIndex = index;
+
     // Hide side menu when channel is selected
     if (isMenuVisible) {
         toggleSideMenu();

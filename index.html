@@ -6,6 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="google-site-verification" content="jDk1s6N-IOBTrNM4PV6WqMvZVyTrDHe8nv0tHPHHvaQ" />
   <link rel="icon" href="https://i.imgur.com/opmOlZ5.png" type="image/x-icon">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a1a2e">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 
@@ -18,6 +20,7 @@
       <button id="backButton">← Back to Channels</button>
     </div>
     <div class="header-controls">
+      <button id="helpButton" title="Keyboard Shortcuts (?)">?</button>
       <button id="muteButton" title="Toggle Mute">🔊</button>
       <input type="range" id="volumeSlider" min="0" max="100" value="60" title="Volume">
       <a id="supportButton" href="https://www.buymeacoffee.com/renanbazinin" target="_blank">
@@ -50,6 +53,29 @@
     <span>_</span>
     <span>_</span>
   </div>
+  <div id="channel-info-overlay" class="hidden">
+    <span class="channel-info-number"></span>
+    <span class="channel-info-name"></span>
+  </div>
+  <!-- Keyboard Shortcuts Help Modal -->
+  <div id="helpModal" class="help-modal-backdrop hidden">
+    <div class="help-modal">
+      <div class="help-modal-header">
+        <h3>Keyboard Shortcuts</h3>
+        <button class="help-modal-close">&times;</button>
+      </div>
+      <div class="help-modal-body">
+        <div class="help-shortcut"><kbd>0</kbd>-<kbd>9</kbd><span>Select channel by number (1-99)</span></div>
+        <div class="help-shortcut"><kbd>&uarr;</kbd><span>Previous channel</span></div>
+        <div class="help-shortcut"><kbd>&darr;</kbd><span>Next channel</span></div>
+        <div class="help-shortcut"><kbd>Backspace</kbd><span>Last watched channel</span></div>
+        <div class="help-shortcut"><kbd>H</kbd><span>Toggle channel picker</span></div>
+        <div class="help-shortcut"><kbd>Esc</kbd><span>Back to channels</span></div>
+        <div class="help-shortcut"><kbd>?</kbd><span>Show this help</span></div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <!-- Modular JS files loaded in dependency order -->
   <script src="js/state.js"></script>
@@ -60,6 +86,11 @@
   <script src="js/helperFetcher.js"></script>
   <script src="js/keyboard.js"></script>
   <script src="js/main.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+  </script>
 </body>
 
 </html>

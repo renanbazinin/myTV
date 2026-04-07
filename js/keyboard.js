@@ -21,6 +21,7 @@ function handleNumericInput(digit) {
                 const channelIndex = channelNumber - 1;
                 if (window.allChannels && window.allChannels[channelIndex]) {
                     const channel = window.allChannels[channelIndex];
+                    showChannelInfoOverlay(channelNumber, channel.name);
                     playChannelFromMenu(channel.url, channel.name, channelIndex);
                 }
             }
@@ -32,6 +33,7 @@ function handleNumericInput(digit) {
 
         if (window.allChannels && window.allChannels[channelIndex]) {
             const channel = window.allChannels[channelIndex];
+            showChannelInfoOverlay(channelNumber, channel.name);
             playChannelFromMenu(channel.url, channel.name, channelIndex);
         }
         setTimeout(resetChannelInput, 500);
@@ -66,18 +68,121 @@ function resetChannelInput() {
 }
 
 /**
+ * Toggle the keyboard shortcuts help modal
+ */
+function toggleHelpModal() {
+    const modal = document.getElementById('helpModal');
+    if (!modal) return;
+    modal.classList.toggle('hidden');
+}
+
+/**
+ * Close the keyboard shortcuts help modal
+ */
+function closeHelpModal() {
+    const modal = document.getElementById('helpModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+/**
+ * Switch channel by relative offset (wraps around)
+ * @param {number} offset - +1 for next, -1 for previous
+ */
+function switchChannelRelative(offset) {
+    if (!window.allChannels || window.allChannels.length === 0) return;
+    if (currentChannelIndex < 0) return;
+
+    const total = window.allChannels.length;
+    const newIndex = ((currentChannelIndex + offset) % total + total) % total;
+    const channel = window.allChannels[newIndex];
+    showChannelInfoOverlay(newIndex + 1, channel.name);
+    playChannelFromMenu(channel.url, channel.name, newIndex);
+}
+
+/**
+ * Switch to the previously watched channel
+ */
+function switchToPreviousChannel() {
+    if (previousChannelIndex < 0) return;
+    if (!window.allChannels || !window.allChannels[previousChannelIndex]) return;
+
+    const channel = window.allChannels[previousChannelIndex];
+    showChannelInfoOverlay(previousChannelIndex + 1, channel.name);
+    playChannelFromMenu(channel.url, channel.name, previousChannelIndex);
+}
+
+/**
+ * Show channel info overlay briefly
+ * @param {number} number - Channel number (1-based)
+ * @param {string} name - Channel name
+ */
+function showChannelInfoOverlay(number, name) {
+    const overlay = document.getElementById('channel-info-overlay');
+    if (!overlay) return;
+
+    overlay.querySelector('.channel-info-number').textContent = number;
+    overlay.querySelector('.channel-info-name').textContent = name;
+    overlay.classList.remove('hidden');
+    overlay.classList.remove('fade-out');
+
+    clearTimeout(overlay._fadeTimer);
+    overlay._fadeTimer = setTimeout(() => {
+        overlay.classList.add('fade-out');
+        setTimeout(() => overlay.classList.add('hidden'), 500);
+    }, 2000);
+}
+
+/**
  * Initialize keyboard event listeners
  */
 function initKeyboardListeners() {
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
+        if (e.key === '?') {
+            toggleHelpModal();
+            return;
+        } else if (e.key === 'Escape') {
+            const helpModal = document.getElementById('helpModal');
+            if (helpModal && !helpModal.classList.contains('hidden')) {
+                closeHelpModal();
+                return;
+            }
             if (!isPickerVisible) {
                 showPicker();
             }
         } else if (e.key === 'h' || e.key === 'H') {
             togglePicker();
+        } else if (e.key === 'ArrowDown' && !isPickerVisible) {
+            e.preventDefault();
+            switchChannelRelative(1);
+        } else if (e.key === 'ArrowUp' && !isPickerVisible) {
+            e.preventDefault();
+            switchChannelRelative(-1);
+        } else if (e.key === 'Backspace' && !isPickerVisible) {
+            e.preventDefault();
+            switchToPreviousChannel();
         } else if (e.key >= '0' && e.key <= '9') {
             handleNumericInput(e.key);
         }
     });
+
+    // Help button click
+    const helpButton = document.getElementById('helpButton');
+    if (helpButton) {
+        helpButton.addEventListener('click', toggleHelpModal);
+    }
+
+    // Help modal backdrop click to close
+    const helpModal = document.getElementById('helpModal');
+    if (helpModal) {
+        helpModal.addEventListener('click', function (e) {
+            if (e.target === helpModal) {
+                closeHelpModal();
+            }
+        });
+        // Close button inside modal
+        const closeBtn = helpModal.querySelector('.help-modal-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeHelpModal);
+        }
+    }
 }

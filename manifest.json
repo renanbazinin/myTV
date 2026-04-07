@@ -1,0 +1,21 @@
+{
+  "name": "RENAN TV",
+  "short_name": "RENAN TV",
+  "description": "Live TV streaming app",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f0f0f",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "https://i.imgur.com/opmOlZ5.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://i.imgur.com/opmOlZ5.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

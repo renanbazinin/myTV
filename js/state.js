@@ -20,6 +20,10 @@ let loadingStatusElement = null;
 let memoryCheckInterval = null;
 let audioVideoSyncInterval = null;
 
+// Channel navigation state
+let currentChannelIndex = -1;
+let previousChannelIndex = -1;
+
 // Channel input state (for numeric keyboard input)
 let channelInput = [];
 let channelInputTimer = null;
