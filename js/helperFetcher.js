@@ -256,8 +256,10 @@ async function fetchStreamUrl(channelId) {
 
     // Map channel IDs to their respective fetchers
     const channelFetchers = {
-        'i24-il': () => getI24NewsStreamUrl('he'),      // Hebrew
-        'i24-en': () => getI24NewsStreamUrl('en'),      // English  
+        // Hebrew: wiztivi/Brightcove was serving a dead 27s VOD (#EXT-X-ENDLIST).
+        // Use our live-edge proxy of the immergo CDN instead (fetcher-token service).
+        'i24-il': () => Promise.resolve('https://fetcher-token-902812087252.me-west1.run.app/i24-live/he'),
+        'i24-en': () => getI24NewsStreamUrl('en'),      // English
         'i24-fr': () => getI24NewsStreamUrl('fr'),      // French
         'i24-ar': () => getI24NewsStreamUrl('ar'),      // Arabic
     };

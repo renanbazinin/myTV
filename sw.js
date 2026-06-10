@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'renan-tv-v1';
+const CACHE_VERSION = 'renan-tv-v2';
 const STATIC_ASSETS = [
   './',
   './index.html',
