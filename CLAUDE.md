@@ -24,7 +24,7 @@ myTV is a vanilla JavaScript (ES6 modules) web app for streaming live TV channel
 ## Key Dependencies (loaded via CDN in index.html)
 
 - **HLS.js** — HLS stream playback (with native HLS fallback for Safari/iOS)
-- **corsproxy.io** — CORS proxy used for fetching protected stream URLs
+- **Cloud Run fetcher** (`fetcher-token-*.run.app`) — self-hosted proxy/resolver for protected streams (e.g. i24News live)
 
 ## Important Patterns
 
@@ -32,7 +32,7 @@ myTV is a vanilla JavaScript (ES6 modules) web app for streaming live TV channel
 - **Dual stream playback**: Some channels have separate video and audio streams that must be synchronized (handled in `hls-player.js`).
 - **Browser-specific logic**: Firefox HEVC handling, Chrome memory API usage, Safari native HLS — conditional paths exist throughout `hls-player.js` and `channels.js`.
 - **Channel data source**: M3U playlist fetched at runtime from a separate GitHub repo (`renanbazinin/myM3U`). Channel behavior is driven by metadata in that playlist.
-- **CORS proxy**: `helperFetcher.js` wraps URLs with corsproxy.io when running locally; this is a key detail when debugging fetch failures.
+- **Protected-stream fetching**: `helperFetcher.js` resolves special channels (i24News) by calling the i24News API directly, or a self-hosted Cloud Run service (`fetcher-token-*.run.app`) for the live Hebrew feed. No third-party CORS proxy is used (the previous `corsproxy.io` dependency was removed — it had been flagged by Google Safe Browsing).
 
 ## Files Outside js/
 

@@ -2,31 +2,6 @@
 // This module handles fetching live stream URLs for channels that require special handling (e.g., i24News)
 
 /**
- * CORS Proxy Configuration
- * Used when running from file:// or localhost to bypass CORS restrictions
- */
-const CORS_PROXY = 'https://corsproxy.io/?';
-
-/**
- * Check if we need to use a CORS proxy (running locally)
- */
-function needsCorsProxy() {
-    const origin = window.location.origin;
-    return origin === 'null' || origin.startsWith('file://') || origin.includes('localhost') || origin.includes('127.0.0.1');
-}
-
-/**
- * Wrap URL with CORS proxy if needed
- */
-function proxyUrl(url) {
-    if (needsCorsProxy()) {
-        console.log('[HelperFetcher] Using CORS proxy for:', url);
-        return CORS_PROXY + encodeURIComponent(url);
-    }
-    return url;
-}
-
-/**
  * i24News API Configuration
  */
 const I24NEWS_CONFIG = {
@@ -63,7 +38,7 @@ async function authenticateI24News() {
     const authUrl = `${I24NEWS_CONFIG.BASE_URL}/authenticate?userName=${I24NEWS_CONFIG.USERNAME}&hardwareId=${encodeURIComponent(hardwareId)}&hardwareIdType=${I24NEWS_CONFIG.HARDWARE_ID_TYPE}`;
 
     try {
-        const response = await fetch(proxyUrl(authUrl), {
+        const response = await fetch(authUrl, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json'
@@ -115,7 +90,7 @@ async function getI24NewsChannel(language = 'he') {
     const url = `${I24NEWS_CONFIG.BASE_URL}/contents/brightcove/channels/${language}`;
 
     try {
-        const response = await fetch(proxyUrl(url), {
+        const response = await fetch(url, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
