@@ -88,7 +88,12 @@
   <script src="js/main.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js');
+      // updateViaCache:'none' = never serve sw.js itself from HTTP cache, so the
+      // worker is always re-checked. .update() forces an immediate check on load
+      // so a new worker (and its fresh code) takes over without manual clearing.
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+        .then((reg) => reg.update())
+        .catch(() => {});
     }
   </script>
 </body>

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'renan-tv-v2';
+const CACHE_VERSION = 'renan-tv-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -34,15 +34,27 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Network-first for same-origin GETs: always try the live network copy so code
+// updates ship immediately, and fall back to cache only when offline. This
+// replaces the old cache-first strategy, which pinned stale JS (e.g. a dead
+// helperFetcher.js) on returning visitors even after a cache-version bump.
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Only cache-first for same-origin static assets; let everything else go to network
+  // Never intercept cross-origin requests (stream playlists, .ts segments,
+  // CDNs). They must go straight to the network.
   if (url.origin !== location.origin) return;
+  if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request);
-    })
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_VERSION)
+          .then((cache) => cache.put(event.request, copy))
+          .catch(() => {});
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
