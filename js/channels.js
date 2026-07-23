@@ -28,23 +28,7 @@ async function playChannelFromMenu(url, name, index) {
         activeItem.classList.add('active');
     }
 
-    if (url.includes('php?m3u8Old')) {
-        const iframe = document.createElement('iframe');
-        iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
-        iframe.style.width = '100%';
-        iframe.style.height = '100%';
-        iframe.style.border = 'none';
-        iframe.allowFullscreen = true;
-        iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
-
-        document.getElementById('videoContainer').innerHTML = '';
-        document.getElementById('videoContainer').appendChild(iframe);
-        document.getElementById('videoContainer').style.display = 'block';
-
-        document.getElementById('channelPicker').style.display = 'none';
-        document.getElementById('backButton').style.display = 'block';
-        isPickerVisible = false;
-    } else if (typeof needsHelperFetcher === 'function' && needsHelperFetcher(name)) {
+    if (typeof needsHelperFetcher === 'function' && needsHelperFetcher(name)) {
         // Special channel that needs dynamic URL fetching (e.g., i24-il for Hebrew stream)
         console.log(`[Channels] Using helperFetcher for: ${name}`);
         try {
@@ -136,22 +120,7 @@ function createButton(name, logo, url, groupTitle) {
         // Stop any currently playing stream before switching
         cleanupAllMedia();
 
-        if (url.includes('php?m3u8')) {
-            const iframe = document.createElement('iframe');
-            iframe.src = 'https://www.mako.co.il/AjaxPage?jspName=embedHTML5video.jsp&galleryChannelId=7c5076a9b8757810VgnVCM100000700a10acRCRD&videoChannelId=d1d6f5dfc8517810VgnVCM100000700a10acRCRD&vcmid=1e2258089b67f510VgnVCM2000002a0c10acRCRD';
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = 'none';
-            iframe.allowFullscreen = true;
-            iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
-            document.getElementById('videoContainer').innerHTML = '';
-            document.getElementById('videoContainer').appendChild(iframe);
-            document.getElementById('videoContainer').style.display = 'block';
-
-            document.getElementById('channelPicker').style.display = 'none';
-            document.getElementById('backButton').style.display = 'block';
-            isPickerVisible = false;
-        } else if (typeof needsHelperFetcher === 'function' && needsHelperFetcher(name)) {
+        if (typeof needsHelperFetcher === 'function' && needsHelperFetcher(name)) {
             // Special channel that needs dynamic URL fetching (e.g., i24-il)
             console.log(`[Channels] Using helperFetcher for: ${name}`);
             try {
