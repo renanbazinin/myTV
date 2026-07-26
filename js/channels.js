@@ -16,7 +16,8 @@ async function playChannelFromMenu(url, name, index) {
     }
     currentChannelIndex = index;
 
-    if (isMenuVisible && isMobileLayout()) {
+    // Always hide the side menu once a channel starts playing
+    if (isMenuVisible) {
         closeSideMenu();
     }
 

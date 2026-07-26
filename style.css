@@ -554,23 +554,18 @@ body {
   cursor: pointer;
 }
 
-/* Video */
+/* Video — always full-bleed; header/player bar overlay on top */
 .video-container,
 #videoContainer {
   position: fixed;
-  top: calc(var(--header-height) + var(--safe-top) + 0.5rem);
-  left: 0;
-  right: 0;
-  bottom: calc(var(--player-bar-height) + var(--safe-bottom));
+  inset: 0;
   z-index: 90;
   background: #000;
-  transition: top 0.28s ease, bottom 0.28s ease;
 }
 
-body.is-playing.chrome-idle .video-container,
-body.is-playing.chrome-idle #videoContainer {
-  top: 0;
-  bottom: 0;
+body.is-playing .video-container,
+body.is-playing #videoContainer {
+  inset: 0;
 }
 
 .video-element {

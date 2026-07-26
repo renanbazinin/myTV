@@ -243,6 +243,9 @@ function setPlaybackChrome(playing) {
     }
 
     if (playing) {
+        if (isMenuVisible) {
+            closeSideMenu();
+        }
         bumpPlaybackChrome();
     } else {
         clearChromeIdleTimer();

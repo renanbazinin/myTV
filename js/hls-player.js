@@ -307,7 +307,8 @@ function enterPlaybackUi() {
     updateMuteButtonIcon();
     isPickerVisible = false;
 
-    if (isMobileLayout() && isMenuVisible) {
+    // Keep the side menu closed while watching
+    if (isMenuVisible) {
         closeSideMenu();
     }
 }
