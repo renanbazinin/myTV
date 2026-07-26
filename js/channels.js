@@ -1,205 +1,371 @@
 // channels.js - Channel loading and display for myTV
 
+const M3U_URL = 'https://raw.githubusercontent.com/renanbazinin/myM3U/main/directLiveNamesDiffandEPG1.m3u';
+const M3U_CACHE_KEY = 'myTV_m3u_cache_v1';
+const M3U_CACHE_TTL_MS = 15 * 60 * 1000;
+
 /**
- * Play channel from side menu
+ * Play channel from menu / grid
  * @param {string} url - Channel stream URL
  * @param {string} name - Channel name
- * @param {number} index - Channel index
+ * @param {number} index - Channel index in window.allChannels
  */
 async function playChannelFromMenu(url, name, index) {
-    // Track channel navigation
     if (currentChannelIndex >= 0) {
         previousChannelIndex = currentChannelIndex;
     }
     currentChannelIndex = index;
 
-    // Hide side menu when channel is selected
-    if (isMenuVisible) {
-        toggleSideMenu();
+    if (isMenuVisible && isMobileLayout()) {
+        closeSideMenu();
     }
 
-    // Stop any currently playing stream before switching
     cleanupAllMedia();
+    updateActiveChannelInLists(index);
 
-    // Update active channel in menu
-    document.querySelectorAll('.channel-menu-item').forEach(item => item.classList.remove('active'));
-    const activeItem = document.querySelector(`[data-index="${index}"]`);
-    if (activeItem) {
-        activeItem.classList.add('active');
-    }
-
-    if (typeof needsHelperFetcher === 'function' && needsHelperFetcher(name)) {
-        // Special channel that needs dynamic URL fetching (e.g., i24-il for Hebrew stream)
-        console.log(`[Channels] Using helperFetcher for: ${name}`);
-        try {
+    try {
+        if (typeof needsHelperFetcher === 'function' && needsHelperFetcher(name)) {
             const dynamicUrl = await fetchStreamUrl(name);
-            if (dynamicUrl) {
-                playStream(dynamicUrl);
-            } else {
-                console.error(`[Channels] Failed to get stream URL for ${name}`);
-                alert(`Failed to load ${name}. Please try again.`);
+            if (!dynamicUrl) {
+                showToast(`Failed to load ${name}. Please try again.`);
+                return;
             }
-        } catch (error) {
-            console.error(`[Channels] Error fetching ${name}:`, error);
-            alert(`Error loading ${name}: ${error.message}`);
+            await playStream(dynamicUrl);
+            return;
         }
-    } else {
-        if (name === '12-kanal-il') {
-            const vlcHeaders = {
-                'User-Agent': 'VLC/3.0.11',
-                'Accept': '*/*'
-            };
-            const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-            let streamUrl = url;
-            if (isFirefox) {
-                streamUrl = url.replace(/_hevc/g, '').replace(/[&?]fmp4/g, '');
-            }
-            playStream(streamUrl, vlcHeaders);
-        } else if (name === '13-kanal-il1') {
-            const vlcHeaders = {
-                'User-Agent': 'VLC/3.0.11',
-                'Accept': '*/*'
-            };
-            playStream(url, vlcHeaders);
-        } else if (name === '13-kanal-il') {
-            const vlcHeaders = {
-                'User-Agent': 'VLC/3.0.11',
-                'Accept': '*/*'
-            };
-            const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-            let streamUrl = url;
-            if (isFirefox) {
-                streamUrl = url.replace(/_hevc/g, '').replace(/[&?]fmp4/g, '');
-            }
-            playStream(streamUrl, vlcHeaders);
-        } else {
-            playStream(url);
+
+        let streamUrl = url;
+        const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+        if ((name === '12-kanal-il' || name === '13-kanal-il') && isFirefox) {
+            streamUrl = url.replace(/_hevc/g, '').replace(/[&?]fmp4/g, '');
         }
+
+        await playStream(streamUrl);
+    } catch (error) {
+        console.error(`[Channels] Error loading ${name}:`, error);
+        showToast(`Error loading ${name}`);
+        showPicker();
     }
 }
 
 /**
- * Create channel button element
- * @param {string} name - Channel name
- * @param {string} logo - Channel logo URL
- * @param {string} url - Channel stream URL
- * @param {string} groupTitle - Channel group/category
- * @returns {HTMLButtonElement} Channel button element
+ * Highlight active channel rows
+ * @param {number} index
  */
-function createButton(name, logo, url, groupTitle) {
-    console.log("groupTitle=" + groupTitle);
-    console.log("isFilterApplied=" + isFilterApplied);
+function updateActiveChannelInLists(index) {
+    document.querySelectorAll('.channel-menu-item').forEach((item) => {
+        item.classList.toggle('active', Number(item.dataset.index) === index);
+    });
+}
 
-    var button = document.createElement('button');
-    button.className = 'channel-button';
-
+/**
+ * Create a logo image with lazy loading and fallback
+ * @param {string} logo
+ * @param {string} name
+ * @param {HTMLElement} host
+ */
+function createChannelLogo(logo, name, host) {
     const img = document.createElement('img');
-    img.src = logo;
     img.alt = name;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.referrerPolicy = 'no-referrer';
+
     img.onerror = function () {
-        this.style.display = 'none';
-        button.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 80px; background: var(--glass-bg); border-radius: 12px; margin-bottom: 0.5rem; font-size: 2rem;">📺</div>' + name;
+        this.remove();
+        const fallback = document.createElement('div');
+        fallback.className = 'channel-logo-fallback';
+        fallback.textContent = '📺';
+        fallback.setAttribute('aria-hidden', 'true');
+        host.insertBefore(fallback, host.firstChild);
     };
 
-    button.appendChild(img);
+    if (logo) {
+        img.src = logo;
+    } else {
+        img.onerror();
+        return null;
+    }
+
+    return img;
+}
+
+/**
+ * Create channel button element
+ * @param {Object} channel
+ * @returns {HTMLButtonElement}
+ */
+function createButton(channel) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'channel-button';
+    button.dataset.index = String(channel.index);
+
+    const img = createChannelLogo(channel.logo, channel.name, button);
+    if (img) {
+        button.appendChild(img);
+    }
 
     const nameDiv = document.createElement('div');
-    nameDiv.textContent = name;
-    nameDiv.style.marginTop = '0.5rem';
-    nameDiv.style.fontSize = '0.85rem';
-    nameDiv.style.fontWeight = '500';
-    nameDiv.style.textAlign = 'center';
-    nameDiv.style.lineHeight = '1.2';
+    nameDiv.className = 'channel-button-name';
+    nameDiv.textContent = channel.name;
     button.appendChild(nameDiv);
 
-    button.addEventListener('click', async function () {
-        if (isMenuVisible) {
-            toggleSideMenu();
-        }
-
-        // Stop any currently playing stream before switching
-        cleanupAllMedia();
-
-        if (typeof needsHelperFetcher === 'function' && needsHelperFetcher(name)) {
-            // Special channel that needs dynamic URL fetching (e.g., i24-il)
-            console.log(`[Channels] Using helperFetcher for: ${name}`);
-            try {
-                const dynamicUrl = await fetchStreamUrl(name);
-                if (dynamicUrl) {
-                    playStream(dynamicUrl);
-                } else {
-                    console.error(`[Channels] Failed to get stream URL for ${name}`);
-                    alert(`Failed to load ${name}. Please try again.`);
-                }
-            } catch (error) {
-                console.error(`[Channels] Error fetching ${name}:`, error);
-                alert(`Error loading ${name}: ${error.message}`);
-            }
-        } else {
-            if (name === '12-kanal-il') {
-                const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-                let streamUrl = url;
-                if (isFirefox) {
-                    streamUrl = url.replace(/_hevc/g, '').replace(/[&?]fmp4/g, '');
-                }
-                playStream(streamUrl);
-            } else if (name === '13-kanal-il') {
-                const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-                let streamUrl = url;
-                if (isFirefox) {
-                    streamUrl = url.replace(/_hevc/g, '').replace(/[&?]fmp4/g, '');
-                }
-                playStream(streamUrl);
-            } else {
-                playStream(url);
-            }
-        }
+    button.addEventListener('click', function () {
+        playChannelFromMenu(channel.url, channel.name, channel.index);
     });
 
     return button;
 }
 
 /**
- * Display channels in the picker grid
- * @param {Array} channelsToShow - Array of channel objects
+ * Filter channels by category + search
+ * @returns {Array}
  */
-function displayChannels(channelsToShow) {
+function getFilteredChannels() {
+    const all = window.allChannels || [];
+    const query = (currentSearchQuery || '').trim().toLowerCase();
+
+    return all.filter((channel) => {
+        const categoryOk = currentCategory === 'All' || channel.groupTitle === currentCategory;
+        if (!categoryOk) return false;
+        if (!query) return true;
+        return channel.name.toLowerCase().includes(query)
+            || (channel.groupTitle || '').toLowerCase().includes(query);
+    });
+}
+
+/**
+ * Render category chips in the browser toolbar
+ */
+function renderCategoryChips() {
+    const chips = document.getElementById('categoryChips');
+    if (!chips) return;
+
+    chips.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
+    availableCategories.forEach((category) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'category-chip' + (category === currentCategory ? ' active' : '');
+        chip.textContent = category;
+        chip.setAttribute('aria-pressed', category === currentCategory ? 'true' : 'false');
+        chip.addEventListener('click', function () {
+            setCategoryFilter(category);
+        });
+        fragment.appendChild(chip);
+    });
+
+    chips.appendChild(fragment);
+}
+
+/**
+ * Render category buttons in the drawer
+ */
+function renderCategoryList() {
+    const list = document.getElementById('categoryList');
+    if (!list) return;
+
+    list.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
+    availableCategories.forEach((category) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'category-item' + (category === currentCategory ? ' active' : '');
+        item.textContent = category;
+        item.addEventListener('click', function () {
+            setCategoryFilter(category);
+            if (isMobileLayout()) {
+                closeSideMenu();
+            }
+        });
+        fragment.appendChild(item);
+    });
+
+    list.appendChild(fragment);
+}
+
+/**
+ * Render channel list in the drawer (lazy logos)
+ */
+function renderChannelList(channels) {
+    const list = document.getElementById('channelList');
+    if (!list) return;
+
+    list.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
+    channels.forEach((channel) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'channel-menu-item' + (channel.index === currentChannelIndex ? ' active' : '');
+        item.dataset.index = String(channel.index);
+
+        const img = createChannelLogo(channel.logo, channel.name, item);
+        if (img) {
+            item.appendChild(img);
+        }
+
+        const span = document.createElement('span');
+        span.textContent = channel.name;
+        item.appendChild(span);
+
+        item.addEventListener('click', function () {
+            playChannelFromMenu(channel.url, channel.name, channel.index);
+        });
+
+        fragment.appendChild(item);
+    });
+
+    list.appendChild(fragment);
+}
+
+/**
+ * Set category filter and re-render
+ * @param {string} category
+ */
+function setCategoryFilter(category) {
+    currentCategory = category || 'All';
+    if (currentCategory === 'All') {
+        isFilterApplied = false;
+    }
+    renderCategoryChips();
+    renderCategoryList();
+    renderFilteredChannels();
+}
+
+/**
+ * Render the filtered channel grid
+ */
+function renderFilteredChannels() {
     const channelPicker = document.getElementById('channelPicker');
+    if (!channelPicker) return;
+
+    const channelsToShow = getFilteredChannels();
     channelPicker.innerHTML = '';
 
-    if (isFilterApplied && channelsToShow === window.allChannels) {
-        channelsToShow = window.allChannels.filter(channel => channel.groupTitle === 'Israel');
-
-        const showUSChannelsButton = document.createElement('button');
-        showUSChannelsButton.id = 'showUSChannels';
-        showUSChannelsButton.className = 'channel-button';
-
-        const flagImg = document.createElement('img');
-        flagImg.src = 'https://i.imgur.com/lUKWqOA.png';
-        flagImg.style.height = '40px';
-        flagImg.style.marginBottom = '0.5rem';
-
-        const textDiv = document.createElement('div');
-        textDiv.textContent = 'Show US Channels';
-        textDiv.style.fontSize = '0.85rem';
-        textDiv.style.fontWeight = '600';
-
-        showUSChannelsButton.appendChild(flagImg);
-        showUSChannelsButton.appendChild(textDiv);
-        channelPicker.appendChild(showUSChannelsButton);
-
-        showUSChannelsButton.addEventListener('click', function () {
-            isFilterApplied = false;
-            displayChannels(window.allChannels);
-        });
+    if (!channelsToShow.length) {
+        const empty = document.createElement('div');
+        empty.className = 'channel-empty';
+        empty.textContent = 'No channels match your search.';
+        channelPicker.appendChild(empty);
+        return;
     }
 
-    channelsToShow.forEach(channel => {
-        const button = createButton(channel.name, channel.logo, channel.url, channel.groupTitle);
-        if (button) {
-            channelPicker.appendChild(button);
+    const fragment = document.createDocumentFragment();
+    channelsToShow.forEach((channel) => {
+        fragment.appendChild(createButton(channel));
+    });
+    channelPicker.appendChild(fragment);
+}
+
+/**
+ * Display channels after initial load / filter reset
+ * @param {Array} channelsToShow
+ */
+function displayChannels(channelsToShow) {
+    window.allChannels = (channelsToShow || []).map((channel, index) => ({
+        ...channel,
+        index: typeof channel.index === 'number' ? channel.index : index
+    }));
+
+    const categories = new Set(['All']);
+    window.allChannels.forEach((channel) => {
+        categories.add(channel.groupTitle || 'Other');
+    });
+    availableCategories = Array.from(categories);
+
+    if (isFilterApplied && availableCategories.includes('Israel')) {
+        currentCategory = 'Israel';
+    } else if (!availableCategories.includes(currentCategory)) {
+        currentCategory = 'All';
+    }
+
+    renderCategoryChips();
+    renderCategoryList();
+    renderChannelList(window.allChannels);
+    renderFilteredChannels();
+}
+
+/**
+ * Parse M3U playlist text into channel objects
+ * @param {string} data
+ * @returns {Array}
+ */
+function parseM3uPlaylist(data) {
+    const lines = data.split(/\r?\n/);
+    const channels = [];
+    let currentChannel = {};
+
+    lines.forEach((line) => {
+        if (line.startsWith('#EXTINF:-1')) {
+            if (currentChannel.name && currentChannel.logo && currentChannel.url) {
+                channels.push(currentChannel);
+                currentChannel = {};
+            }
+            const nameMatch = line.match(/tvg-id="([^"]+)"/);
+            const logoMatch = line.match(/tvg-logo="([^"]+)"/);
+            const groupTitleMatch = line.match(/group-title="([^"]+)"/);
+            if (nameMatch && logoMatch) {
+                currentChannel = {
+                    name: nameMatch[1],
+                    logo: logoMatch[1],
+                    groupTitle: groupTitleMatch ? groupTitleMatch[1] : 'Other'
+                };
+            }
+        } else if (line.trim() !== '' && !line.startsWith('#')) {
+            currentChannel.url = line;
         }
     });
+
+    if (currentChannel.name && currentChannel.logo && currentChannel.url) {
+        channels.push(currentChannel);
+    }
+
+    return channels.map((channel, index) => ({ ...channel, index }));
+}
+
+/**
+ * Read short-lived M3U cache from sessionStorage
+ * @returns {{channels: Array, fetchedAt: number}|null}
+ */
+function readM3uCache() {
+    try {
+        const raw = sessionStorage.getItem(M3U_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.channels) || !parsed.fetchedAt) return null;
+        if (Date.now() - parsed.fetchedAt > M3U_CACHE_TTL_MS) return null;
+        return parsed;
+    } catch (_error) {
+        return null;
+    }
+}
+
+/**
+ * Persist M3U cache
+ * @param {Array} channels
+ */
+function writeM3uCache(channels) {
+    try {
+        sessionStorage.setItem(M3U_CACHE_KEY, JSON.stringify({
+            channels,
+            fetchedAt: Date.now()
+        }));
+    } catch (_error) {
+        // Ignore quota / private mode failures
+    }
+}
+
+/**
+ * Apply loaded channels to the UI
+ * @param {Array} channels
+ */
+function applyChannels(channels) {
+    displayChannels(channels);
+    showPicker();
 }
 
 /**
@@ -207,96 +373,36 @@ function displayChannels(channelsToShow) {
  */
 function start() {
     const channelPicker = document.getElementById('channelPicker');
-    const sideMenuElement = document.getElementById('sideMenu');
-    channelPicker.innerHTML = '<div class="loading">Loading channels...</div>';
+    if (channelPicker) {
+        channelPicker.innerHTML = '<div class="loading">Loading channels...</div>';
+    }
 
-    fetch('https://raw.githubusercontent.com/renanbazinin/myM3U/main/directLiveNamesDiffandEPG1.m3u')
-        .then(response => response.text())
-        .then(data => {
-            channelPicker.innerHTML = '';
+    const cached = readM3uCache();
+    if (cached) {
+        applyChannels(cached.channels);
+    }
 
-            const lines = data.split(/\r?\n/);
-            const channels = [];
-            const categories = new Set();
-            let currentChannel = {};
-
-            lines.forEach(line => {
-                if (line.startsWith('#EXTINF:-1')) {
-                    if (currentChannel.name && currentChannel.logo && currentChannel.url) {
-                        channels.push(currentChannel);
-                        currentChannel = {};
-                    }
-                    const nameMatch = line.match(/tvg-id="([^"]+)"/);
-                    const logoMatch = line.match(/tvg-logo="([^"]+)"/);
-                    const groupTitleMatch = line.match(/group-title="([^"]+)"/);
-                    if (nameMatch && logoMatch) {
-                        currentChannel.name = nameMatch[1];
-                        currentChannel.logo = logoMatch[1];
-                        currentChannel.groupTitle = groupTitleMatch ? groupTitleMatch[1] : 'Other';
-                        categories.add(currentChannel.groupTitle);
-                    }
-                } else if (line.trim() !== '' && !line.startsWith('#')) {
-                    currentChannel.url = line;
-                }
-            });
-
-            if (currentChannel.name && currentChannel.logo && currentChannel.url) {
-                channels.push(currentChannel);
-                categories.add(currentChannel.groupTitle);
+    fetch(M3U_URL)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error(`Playlist HTTP ${response.status}`);
             }
-
-            // Populate side menu with channels
-            const channelMenuContent = channels.map((channel, index) =>
-                `<div class="channel-menu-item" onclick="playChannelFromMenu('${channel.url}', '${channel.name}', ${index})" data-index="${index}">
-                    <img src="${channel.logo}" alt="${channel.name}" onerror="this.style.display='none'" style="width: 30px; height: 30px; border-radius: 6px; margin-right: 10px; object-fit: cover;">
-                    <span>${channel.name}</span>
-                </div>`
-            ).join('');
-
-            sideMenuElement.innerHTML = `
-                <div style="padding: 1rem 0; border-bottom: 1px solid var(--glass-border); margin-bottom: 1rem;">
-                    <h3 style="margin: 0; color: var(--text-primary); font-size: 1.1rem; font-weight: 600;">Channels</h3>
-                </div>
-                ${channelMenuContent}
-                <style>
-                    .channel-menu-item {
-                        display: flex;
-                        align-items: center;
-                        padding: 0.75rem 1rem;
-                        margin: 0.25rem 0;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        transition: all 0.3s ease;
-                        color: var(--text-secondary);
-                        font-weight: 500;
-                        border: 1px solid transparent;
-                        font-size: 0.9rem;
-                    }
-                    .channel-menu-item:hover, .channel-menu-item.active {
-                        background: var(--glass-bg);
-                        border-color: var(--accent-color);
-                        color: var(--text-primary);
-                        transform: translateX(4px);
-                    }
-                    .channel-menu-item span {
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
-                    }
-                </style>
-            `;
-
-            // Store channels globally for filtering
-            window.allChannels = channels;
-
-            // Display channels based on filter
-            displayChannels(channels);
-
-            // Show channel picker (no auto-play)
-            showPicker();
+            return response.text();
         })
-        .catch(error => {
+        .then((data) => {
+            const channels = parseM3uPlaylist(data);
+            if (!channels.length) {
+                throw new Error('Playlist contained no channels');
+            }
+            writeM3uCache(channels);
+            applyChannels(channels);
+        })
+        .catch((error) => {
             console.error('Error loading channels:', error);
-            channelPicker.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 2rem;">Failed to load channels. Please try again.</div>';
+            if (cached) {
+                showToast('Using cached channel list (offline refresh failed)');
+                return;
+            }
+            showErrorState('Failed to load channels. Please try again.', start);
         });
 }

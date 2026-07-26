@@ -1,6 +1,17 @@
 // keyboard.js - Keyboard shortcuts and numeric input for myTV
 
 /**
+ * Whether keyboard shortcuts should be ignored (typing in a field)
+ * @param {EventTarget|null} target
+ */
+function isTypingTarget(target) {
+    if (!target || !(target instanceof Element)) return false;
+    const tag = target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    return target.isContentEditable;
+}
+
+/**
  * Handle numeric keyboard input for channel selection
  * @param {string} digit - Single digit character (0-9)
  */
@@ -16,7 +27,7 @@ function handleNumericInput(digit) {
 
     if (channelInput.length === 1) {
         channelInputTimer = setTimeout(() => {
-            const channelNumber = parseInt(channelInput[0]);
+            const channelNumber = parseInt(channelInput[0], 10);
             if (channelNumber > 0) {
                 const channelIndex = channelNumber - 1;
                 if (window.allChannels && window.allChannels[channelIndex]) {
@@ -26,9 +37,9 @@ function handleNumericInput(digit) {
                 }
             }
             resetChannelInput();
-        }, 1500); // 1.5-second wait
+        }, 1500);
     } else if (channelInput.length === 2) {
-        const channelNumber = parseInt(channelInput.join(''));
+        const channelNumber = parseInt(channelInput.join(''), 10);
         const channelIndex = channelNumber - 1;
 
         if (window.allChannels && window.allChannels[channelIndex]) {
@@ -68,12 +79,37 @@ function resetChannelInput() {
 }
 
 /**
+ * Switch help modal tab
+ * @param {string} tabName
+ */
+function setHelpTab(tabName) {
+    const modal = document.getElementById('helpModal');
+    if (!modal) return;
+
+    modal.querySelectorAll('.help-tab').forEach((tab) => {
+        const active = tab.dataset.tab === tabName;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+
+    modal.querySelectorAll('.help-panel').forEach((panel) => {
+        panel.classList.toggle('hidden', panel.dataset.panel !== tabName);
+    });
+}
+
+/**
  * Toggle the keyboard shortcuts help modal
  */
 function toggleHelpModal() {
     const modal = document.getElementById('helpModal');
     if (!modal) return;
+    const willOpen = modal.classList.contains('hidden');
     modal.classList.toggle('hidden');
+    if (willOpen) {
+        setHelpTab(isMobileLayout() ? 'touch' : 'keyboard');
+        const closeBtn = modal.querySelector('.help-modal-close');
+        if (closeBtn) closeBtn.focus();
+    }
 }
 
 /**
@@ -137,19 +173,39 @@ function showChannelInfoOverlay(number, name) {
  */
 function initKeyboardListeners() {
     document.addEventListener('keydown', function (e) {
+        if (isTypingTarget(e.target)) {
+            if (e.key === 'Escape') {
+                e.target.blur();
+            }
+            return;
+        }
+
         if (e.key === '?') {
             toggleHelpModal();
             return;
-        } else if (e.key === 'Escape') {
+        }
+
+        if (e.key === 'Escape') {
             const helpModal = document.getElementById('helpModal');
             if (helpModal && !helpModal.classList.contains('hidden')) {
                 closeHelpModal();
                 return;
             }
+            if (moreSheet && !moreSheet.hidden) {
+                closeMoreSheet();
+                return;
+            }
+            if (isMenuVisible && isMobileLayout()) {
+                closeSideMenu();
+                return;
+            }
             if (!isPickerVisible) {
                 showPicker();
             }
-        } else if (e.key === 'h' || e.key === 'H') {
+            return;
+        }
+
+        if (e.key === 'h' || e.key === 'H') {
             togglePicker();
         } else if (e.key === 'ArrowDown' && !isPickerVisible) {
             e.preventDefault();
@@ -165,13 +221,11 @@ function initKeyboardListeners() {
         }
     });
 
-    // Help button click
     const helpButton = document.getElementById('helpButton');
     if (helpButton) {
         helpButton.addEventListener('click', toggleHelpModal);
     }
 
-    // Help modal backdrop click to close
     const helpModal = document.getElementById('helpModal');
     if (helpModal) {
         helpModal.addEventListener('click', function (e) {
@@ -179,10 +233,16 @@ function initKeyboardListeners() {
                 closeHelpModal();
             }
         });
-        // Close button inside modal
+
         const closeBtn = helpModal.querySelector('.help-modal-close');
         if (closeBtn) {
             closeBtn.addEventListener('click', closeHelpModal);
         }
+
+        helpModal.querySelectorAll('.help-tab').forEach((tab) => {
+            tab.addEventListener('click', function () {
+                setHelpTab(tab.dataset.tab);
+            });
+        });
     }
 }

@@ -3,16 +3,15 @@
 /**
  * Initialize the application when DOM is ready
  */
-window.onload = function () {
-    // Initialize DOM references from state.js
+function bootApp() {
     initDomReferences();
-
-    // Initialize UI event listeners
     initUiEventListeners();
-
-    // Initialize keyboard listeners
     initKeyboardListeners();
-
-    // Start loading channels
     start();
-};
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootApp, { once: true });
+} else {
+    bootApp();
+}

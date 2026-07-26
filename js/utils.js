@@ -11,33 +11,10 @@ function showLoadingMessage(message = 'Loading buffer...') {
     if (!loadingStatusElement) {
         loadingStatusElement = document.createElement('div');
         loadingStatusElement.className = 'loading-status-overlay';
-        loadingStatusElement.style.position = 'absolute';
-        loadingStatusElement.style.top = '50%';
-        loadingStatusElement.style.left = '50%';
-        loadingStatusElement.style.transform = 'translate(-50%, -50%)';
-        loadingStatusElement.style.padding = '0.85rem 1.5rem';
-        loadingStatusElement.style.borderRadius = '999px';
-        loadingStatusElement.style.background = 'rgba(15, 15, 15, 0.75)';
-        loadingStatusElement.style.color = '#fff';
-        loadingStatusElement.style.fontSize = '1rem';
-        loadingStatusElement.style.fontWeight = '600';
-        loadingStatusElement.style.letterSpacing = '0.02em';
-        loadingStatusElement.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.35)';
-        loadingStatusElement.style.zIndex = '10';
-        loadingStatusElement.style.display = 'none';
-        loadingStatusElement.style.alignItems = 'center';
-        loadingStatusElement.style.justifyContent = 'center';
-        loadingStatusElement.style.gap = '0.65rem';
-        loadingStatusElement.style.pointerEvents = 'none';
 
         const spinner = document.createElement('span');
         spinner.className = 'loading-spinner';
-        spinner.style.width = '1rem';
-        spinner.style.height = '1rem';
-        spinner.style.border = '2px solid rgba(255, 255, 255, 0.2)';
-        spinner.style.borderTopColor = '#fff';
-        spinner.style.borderRadius = '50%';
-        spinner.style.animation = 'loading-spin 1s linear infinite';
+        spinner.setAttribute('aria-hidden', 'true');
 
         const textNode = document.createElement('span');
         textNode.className = 'loading-text';
@@ -49,8 +26,6 @@ function showLoadingMessage(message = 'Loading buffer...') {
     const textElement = loadingStatusElement.querySelector('.loading-text');
     if (textElement) {
         textElement.textContent = message;
-    } else {
-        loadingStatusElement.textContent = message;
     }
 
     if (loadingStatusElement.parentElement !== container) {
@@ -70,21 +45,56 @@ function hideLoadingMessage() {
 }
 
 /**
- * Inject keyframes for spinner animation if not already present
+ * Show a non-blocking toast message
+ * @param {string} message
+ * @param {number} durationMs
  */
-function ensureLoadingSpinnerStyles() {
-    const existing = document.getElementById('loading-spinner-styles');
-    if (existing) return;
+function showToast(message, durationMs = 3200) {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
 
-    const style = document.createElement('style');
-    style.id = 'loading-spinner-styles';
-    style.textContent = `
-        @keyframes loading-spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-    `;
-    document.head.appendChild(style);
+    toast.textContent = message;
+    toast.hidden = false;
+
+    if (toastTimer) {
+        clearTimeout(toastTimer);
+    }
+
+    toastTimer = setTimeout(() => {
+        toast.hidden = true;
+        toastTimer = null;
+    }, durationMs);
+}
+
+/**
+ * Show an in-app error with optional retry action
+ * @param {string} message
+ * @param {Function|null} onRetry
+ */
+function showErrorState(message, onRetry = null) {
+    const channelPicker = document.getElementById('channelPicker');
+    if (!channelPicker) {
+        showToast(message);
+        return;
+    }
+
+    channelPicker.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'error-state';
+
+    const text = document.createElement('div');
+    text.textContent = message;
+    wrap.appendChild(text);
+
+    if (typeof onRetry === 'function') {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = 'Retry';
+        button.addEventListener('click', onRetry);
+        wrap.appendChild(button);
+    }
+
+    channelPicker.appendChild(wrap);
 }
 
 /**
@@ -126,5 +136,66 @@ function normalizePlaybackOptions(options) {
     };
 }
 
-// Initialize spinner styles on load
-ensureLoadingSpinnerStyles();
+/**
+ * Detect whether the current device should use a lighter HLS buffer profile.
+ */
+function shouldUseMobileHlsProfile() {
+    if (typeof navigator !== 'undefined' && typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 4) {
+        return true;
+    }
+    return window.matchMedia('(max-width: 1023px), (pointer: coarse)').matches;
+}
+
+/**
+ * Build HLS.js config tuned for the current device.
+ * @param {Object} [overrides]
+ */
+function getHlsConfig(overrides = {}) {
+    const mobile = shouldUseMobileHlsProfile();
+    const base = mobile
+        ? {
+            enableWorker: true,
+            lowLatencyMode: false,
+            liveSyncDuration: 18,
+            liveMaxLatencyDuration: 40,
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
+            backBufferLength: 20,
+            maxBufferSize: 60 * 1000 * 1000,
+            maxBufferHole: 0.5,
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 3,
+            levelLoadingTimeOut: 10000,
+            fragLoadingTimeOut: 20000,
+            fragLoadingMaxRetry: 3
+        }
+        : {
+            enableWorker: true,
+            lowLatencyMode: false,
+            liveSyncDuration: 25,
+            liveMaxLatencyDuration: 50,
+            maxBufferLength: 60,
+            maxMaxBufferLength: 120,
+            backBufferLength: 30,
+            maxBufferSize: 250 * 1000 * 1000,
+            maxBufferHole: 0.5,
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 3,
+            levelLoadingTimeOut: 10000,
+            fragLoadingTimeOut: 20000,
+            fragLoadingMaxRetry: 3
+        };
+
+    return { ...base, ...overrides };
+}
+
+/**
+ * Apply common mobile-safe attributes to a media element.
+ * @param {HTMLMediaElement} media
+ */
+function applyMobileMediaAttributes(media) {
+    if (!media) return;
+    media.setAttribute('playsinline', '');
+    media.setAttribute('webkit-playsinline', '');
+    media.setAttribute('x-webkit-airplay', 'allow');
+}

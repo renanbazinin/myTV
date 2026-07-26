@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'renan-tv-v3';
+const CACHE_VERSION = 'renan-tv-v5-chrome-idle';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -35,9 +35,7 @@ self.addEventListener('activate', (event) => {
 });
 
 // Network-first for same-origin GETs: always try the live network copy so code
-// updates ship immediately, and fall back to cache only when offline. This
-// replaces the old cache-first strategy, which pinned stale JS (e.g. a dead
-// helperFetcher.js) on returning visitors even after a cache-version bump.
+// updates ship immediately, and fall back to cache only when offline.
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 

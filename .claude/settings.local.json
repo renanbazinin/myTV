@@ -16,7 +16,8 @@
       "WebFetch",
       "Bash(openspec new:*)",
       "Bash(openspec status:*)",
-      "Bash(openspec instructions:*)"
+      "Bash(openspec instructions:*)",
+      "WebSearch"
     ],
     "deny": [
       "Bash(rm *)",

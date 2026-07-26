@@ -1,17 +1,64 @@
 // ui.js - UI controls for myTV
 
 /**
+ * Sync menu button / scrim / body classes with drawer state
+ */
+function syncMenuUi() {
+    const open = isMenuVisible;
+
+    if (sideMenu) {
+        sideMenu.classList.toggle('hidden', !open);
+        sideMenu.classList.toggle('open', open);
+        sideMenu.setAttribute('aria-hidden', open ? 'false' : 'true');
+        if (open) {
+            sideMenu.removeAttribute('inert');
+        } else {
+            sideMenu.setAttribute('inert', '');
+        }
+    }
+
+    if (contentArea) {
+        contentArea.classList.toggle('expanded', !open || isMobileLayout());
+    }
+
+    if (drawerScrim) {
+        const showScrim = open && isMobileLayout();
+        drawerScrim.hidden = !showScrim;
+        drawerScrim.setAttribute('aria-hidden', showScrim ? 'false' : 'true');
+    }
+
+    if (menuButton) {
+        menuButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+        menuButton.setAttribute('aria-label', open ? 'Close channel categories' : 'Open channel categories');
+    }
+
+    document.body.classList.toggle('desktop-menu-open', open && !isMobileLayout());
+}
+
+/**
+ * Open the side menu / drawer
+ */
+function openSideMenu() {
+    isMenuVisible = true;
+    syncMenuUi();
+}
+
+/**
+ * Close the side menu / drawer
+ */
+function closeSideMenu() {
+    isMenuVisible = false;
+    syncMenuUi();
+}
+
+/**
  * Toggle side menu visibility
  */
 function toggleSideMenu() {
     if (isMenuVisible) {
-        sideMenu.classList.add('hidden');
-        contentArea.classList.add('expanded');
-        isMenuVisible = false;
+        closeSideMenu();
     } else {
-        sideMenu.classList.remove('hidden');
-        contentArea.classList.remove('expanded');
-        isMenuVisible = true;
+        openSideMenu();
     }
 }
 
@@ -22,7 +69,7 @@ function toggleSideMenu() {
 function updateMuteButtonVisibility(hidden) {
     const muteButton = document.getElementById('muteButton');
     if (muteButton) {
-        muteButton.style.display = hidden ? 'none' : 'flex';
+        muteButton.hidden = !!hidden;
     }
 }
 
@@ -32,14 +79,19 @@ function updateMuteButtonVisibility(hidden) {
 function updateMuteButtonIcon() {
     const muteButton = document.getElementById('muteButton');
     if (!muteButton) return;
+
     if (isMuted) {
         muteButton.textContent = '🔇';
         muteButton.classList.add('muted');
         muteButton.title = 'Unmute';
+        muteButton.setAttribute('aria-label', 'Unmute');
+        muteButton.setAttribute('aria-pressed', 'true');
     } else {
         muteButton.textContent = '🔊';
         muteButton.classList.remove('muted');
         muteButton.title = 'Mute';
+        muteButton.setAttribute('aria-label', 'Mute');
+        muteButton.setAttribute('aria-pressed', 'false');
     }
 }
 
@@ -58,44 +110,146 @@ function applyVolumeToMedia() {
 }
 
 /**
+ * Persist volume shortly after the user stops dragging
+ */
+function persistVolumeSoon() {
+    if (volumePersistTimer) {
+        clearTimeout(volumePersistTimer);
+    }
+    volumePersistTimer = setTimeout(() => {
+        localStorage.setItem('myTV_volume', String(currentVolume));
+        localStorage.setItem('myTV_isMuted', String(isMuted));
+        volumePersistTimer = null;
+    }, 180);
+}
+
+/**
+ * Sync both volume sliders to the current value
+ */
+function syncVolumeSliders() {
+    const value = isMuted ? 0 : Math.round(currentVolume * 100);
+    const mainSlider = document.getElementById('volumeSlider');
+    const sheetSlider = document.getElementById('volumeSliderSheet');
+    if (mainSlider) {
+        mainSlider.value = String(value);
+        mainSlider.setAttribute('aria-valuenow', String(value));
+    }
+    if (sheetSlider) {
+        sheetSlider.value = String(value);
+    }
+}
+
+/**
  * Set volume from slider value (0-100)
  */
 function setVolume(value) {
-    currentVolume = value / 100;
-    localStorage.setItem('myTV_volume', String(currentVolume));
+    const numeric = Number(value);
+    currentVolume = Math.max(0, Math.min(100, numeric)) / 100;
 
-    if (value === 0 && !isMuted) {
+    if (numeric === 0 && !isMuted) {
         isMuted = true;
-        localStorage.setItem('myTV_isMuted', 'true');
         updateMuteButtonIcon();
-    } else if (value > 0 && isMuted) {
+    } else if (numeric > 0 && isMuted) {
         isMuted = false;
-        localStorage.setItem('myTV_isMuted', 'false');
         updateMuteButtonIcon();
     }
 
     applyVolumeToMedia();
+    syncVolumeSliders();
+    persistVolumeSoon();
 }
 
 /**
  * Toggle mute state for video and audio
  */
 function toggleMute() {
-    const volumeSlider = document.getElementById('volumeSlider');
+    isMuted = !isMuted;
+    localStorage.setItem('myTV_isMuted', String(isMuted));
 
-    if (currentVideoElement || currentAudioElement) {
-        isMuted = !isMuted;
-        localStorage.setItem('myTV_isMuted', String(isMuted));
+    if (isMuted) {
+        // keep currentVolume for restore
+    } else if (currentVolume === 0) {
+        currentVolume = 0.6;
+    }
 
-        if (isMuted) {
-            if (volumeSlider) volumeSlider.value = 0;
-        } else {
-            if (currentVolume === 0) currentVolume = 1;
-            if (volumeSlider) volumeSlider.value = currentVolume * 100;
+    applyVolumeToMedia();
+    updateMuteButtonIcon();
+    syncVolumeSliders();
+}
+
+/**
+ * Clear the playback chrome idle timer
+ */
+function clearChromeIdleTimer() {
+    if (chromeIdleTimer) {
+        clearTimeout(chromeIdleTimer);
+        chromeIdleTimer = null;
+    }
+}
+
+/**
+ * Reveal playback controls (header + player bar)
+ */
+function showPlaybackChrome() {
+    document.body.classList.remove('chrome-idle');
+    if (playerBar) {
+        playerBar.setAttribute('aria-hidden', 'false');
+    }
+}
+
+/**
+ * Hide playback controls after idle
+ */
+function hidePlaybackChrome() {
+    if (!document.body.classList.contains('is-playing')) return;
+    if (moreSheet && !moreSheet.hidden) return;
+    const helpModal = document.getElementById('helpModal');
+    if (helpModal && !helpModal.classList.contains('hidden')) return;
+
+    document.body.classList.add('chrome-idle');
+    if (playerBar) {
+        playerBar.setAttribute('aria-hidden', 'true');
+    }
+}
+
+/**
+ * Show chrome now, then auto-hide after a few idle seconds
+ */
+function bumpPlaybackChrome() {
+    if (!document.body.classList.contains('is-playing')) return;
+    showPlaybackChrome();
+    clearChromeIdleTimer();
+    chromeIdleTimer = setTimeout(hidePlaybackChrome, CHROME_IDLE_MS);
+}
+
+/**
+ * Show / hide playback chrome
+ * @param {boolean} playing
+ */
+function setPlaybackChrome(playing) {
+    document.body.classList.toggle('is-playing', playing);
+
+    const backButton = document.getElementById('backButton');
+    const videoContainer = document.getElementById('videoContainer');
+
+    if (backButton) {
+        backButton.hidden = !playing;
+    }
+    if (videoContainer) {
+        videoContainer.hidden = !playing;
+    }
+    if (playerBar) {
+        playerBar.hidden = !playing;
+    }
+
+    if (playing) {
+        bumpPlaybackChrome();
+    } else {
+        clearChromeIdleTimer();
+        document.body.classList.remove('chrome-idle');
+        if (playerBar) {
+            playerBar.setAttribute('aria-hidden', 'true');
         }
-
-        applyVolumeToMedia();
-        updateMuteButtonIcon();
     }
 }
 
@@ -104,25 +258,35 @@ function toggleMute() {
  */
 function showPicker() {
     cleanupAllMedia();
-    document.getElementById('channelPicker').style.display = 'grid';
-    document.getElementById('videoContainer').style.display = 'none';
-    document.getElementById('backButton').style.display = 'none';
+    closeMoreSheet();
 
-    // Show side menu when going back to channels
-    if (!isMenuVisible) {
-        sideMenu.classList.remove('hidden');
-        contentArea.classList.remove('expanded');
-        isMenuVisible = true;
+    const channelPicker = document.getElementById('channelPicker');
+    if (channelPicker) {
+        channelPicker.hidden = false;
+        if (!channelPicker.children.length && window.allChannels) {
+            renderFilteredChannels();
+        }
     }
 
+    setPlaybackChrome(false);
     isPickerVisible = true;
+
+    // Keep desktop sidebar open; close overlay drawer on mobile after leaving playback
+    if (!isMobileLayout()) {
+        openSideMenu();
+    } else {
+        closeSideMenu();
+    }
 }
 
 /**
  * Hide channel picker
  */
 function hidePicker() {
-    document.getElementById('channelPicker').style.display = 'none';
+    const channelPicker = document.getElementById('channelPicker');
+    if (channelPicker) {
+        channelPicker.hidden = true;
+    }
     isPickerVisible = false;
 }
 
@@ -138,32 +302,168 @@ function togglePicker() {
 }
 
 /**
+ * Open overflow options sheet
+ */
+function openMoreSheet() {
+    if (!moreSheet) return;
+    moreSheet.hidden = false;
+    const moreButton = document.getElementById('moreButton');
+    if (moreButton) {
+        moreButton.setAttribute('aria-expanded', 'true');
+    }
+    syncVolumeSliders();
+}
+
+/**
+ * Close overflow options sheet
+ */
+function closeMoreSheet() {
+    if (!moreSheet) return;
+    moreSheet.hidden = true;
+    const moreButton = document.getElementById('moreButton');
+    if (moreButton) {
+        moreButton.setAttribute('aria-expanded', 'false');
+    }
+}
+
+/**
  * Initialize UI event listeners
  */
 function initUiEventListeners() {
-    // Mute button click handler
     const muteButton = document.getElementById('muteButton');
     if (muteButton) {
         muteButton.addEventListener('click', toggleMute);
     }
 
-    // Volume slider handler
     const volumeSlider = document.getElementById('volumeSlider');
     if (volumeSlider) {
-        volumeSlider.value = isMuted ? 0 : currentVolume * 100;
         volumeSlider.addEventListener('input', function () {
             setVolume(parseInt(this.value, 10));
         });
     }
 
-    // Set initial mute button icon from stored state
-    updateMuteButtonIcon();
+    const volumeSliderSheet = document.getElementById('volumeSliderSheet');
+    if (volumeSliderSheet) {
+        volumeSliderSheet.addEventListener('input', function () {
+            setVolume(parseInt(this.value, 10));
+        });
+    }
 
-    // Back button click handler
+    updateMuteButtonIcon();
+    syncVolumeSliders();
+
     const backButton = document.getElementById('backButton');
     if (backButton) {
         backButton.addEventListener('click', function () {
-            toggleSideMenu();
+            showPicker();
         });
     }
+
+    if (menuButton) {
+        menuButton.addEventListener('click', toggleSideMenu);
+    }
+
+    if (closeMenuButton) {
+        closeMenuButton.addEventListener('click', closeSideMenu);
+    }
+
+    if (drawerScrim) {
+        drawerScrim.addEventListener('click', closeSideMenu);
+    }
+
+    const browseChannelsButton = document.getElementById('browseChannelsButton');
+    if (browseChannelsButton) {
+        browseChannelsButton.addEventListener('click', showPicker);
+    }
+
+    const prevChannelButton = document.getElementById('prevChannelButton');
+    if (prevChannelButton) {
+        prevChannelButton.addEventListener('click', function () {
+            if (typeof switchChannelRelative === 'function') {
+                switchChannelRelative(-1);
+            }
+        });
+    }
+
+    const nextChannelButton = document.getElementById('nextChannelButton');
+    if (nextChannelButton) {
+        nextChannelButton.addEventListener('click', function () {
+            if (typeof switchChannelRelative === 'function') {
+                switchChannelRelative(1);
+            }
+        });
+    }
+
+    const moreButton = document.getElementById('moreButton');
+    if (moreButton) {
+        moreButton.addEventListener('click', openMoreSheet);
+    }
+
+    if (moreSheet) {
+        moreSheet.addEventListener('click', function (event) {
+            if (event.target === moreSheet) {
+                closeMoreSheet();
+            }
+        });
+        const closeBtn = moreSheet.querySelector('.more-sheet-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeMoreSheet);
+        }
+    }
+
+    const moreHelpButton = document.getElementById('moreHelpButton');
+    if (moreHelpButton) {
+        moreHelpButton.addEventListener('click', function () {
+            closeMoreSheet();
+            if (typeof toggleHelpModal === 'function') {
+                toggleHelpModal();
+            }
+        });
+    }
+
+    const channelSearch = document.getElementById('channelSearch');
+    if (channelSearch) {
+        channelSearch.addEventListener('input', function () {
+            currentSearchQuery = this.value || '';
+            if (typeof renderFilteredChannels === 'function') {
+                renderFilteredChannels();
+            }
+        });
+    }
+
+    // Reveal compact playback controls on interaction, then hide after idle
+    let lastChromeBump = 0;
+    const revealChrome = () => {
+        const now = Date.now();
+        if (now - lastChromeBump < 120) return;
+        lastChromeBump = now;
+        bumpPlaybackChrome();
+    };
+    document.addEventListener('pointerdown', revealChrome, { passive: true });
+    document.addEventListener('mousemove', revealChrome, { passive: true });
+    document.addEventListener('touchstart', revealChrome, { passive: true });
+    document.addEventListener('keydown', revealChrome);
+
+    // Initial menu state: open on desktop, closed on mobile
+    if (isMobileLayout()) {
+        closeSideMenu();
+    } else {
+        openSideMenu();
+    }
+
+    window.addEventListener('resize', function () {
+        // Keep desktop sidebar open; ensure mobile drawer closes on breakpoint flip
+        if (isMobileLayout() && isMenuVisible && isPickerVisible) {
+            // leave as-is if user opened it
+            syncMenuUi();
+        } else if (!isMobileLayout()) {
+            if (!isMenuVisible && isPickerVisible) {
+                openSideMenu();
+            } else {
+                syncMenuUi();
+            }
+        } else {
+            syncMenuUi();
+        }
+    });
 }

@@ -162,6 +162,7 @@ function cleanupAllMedia() {
     hideLoadingMessage();
     clearAudioVideoSyncInterval();
     clearMemoryMonitor();
+    clearPlaybackOverlays();
 
     if (currentHlsVideoInstance) {
         cleanupHlsInstance(currentHlsVideoInstance);
@@ -188,12 +189,138 @@ function cleanupAllMedia() {
 }
 
 /**
+ * Remove temporary overlays from the video container
+ */
+function clearPlaybackOverlays() {
+    const container = document.getElementById('videoContainer');
+    if (!container) return;
+    container.querySelectorAll('.tap-to-unmute, .retry-overlay').forEach((node) => node.remove());
+}
+
+/**
+ * Show a tap-to-unmute overlay when autoplay was forced muted
+ * @param {HTMLVideoElement} videoElement
+ */
+function showTapToUnmuteOverlay(videoElement) {
+    const container = document.getElementById('videoContainer');
+    if (!container) return;
+
+    clearPlaybackOverlays();
+
+    const overlay = document.createElement('button');
+    overlay.type = 'button';
+    overlay.className = 'tap-to-unmute';
+    overlay.textContent = 'Tap to unmute';
+    overlay.addEventListener('click', function () {
+        isMuted = false;
+        if (currentVolume === 0) currentVolume = 0.6;
+        localStorage.setItem('myTV_isMuted', 'false');
+        localStorage.setItem('myTV_volume', String(currentVolume));
+        videoElement.muted = false;
+        videoElement.volume = currentVolume;
+        applyVolumeToMedia();
+        updateMuteButtonIcon();
+        syncVolumeSliders();
+        overlay.remove();
+    });
+
+    container.appendChild(overlay);
+}
+
+/**
+ * Show a retry overlay when playback fails
+ * @param {string} message
+ * @param {Function} onRetry
+ */
+function showRetryOverlay(message, onRetry) {
+    const container = document.getElementById('videoContainer');
+    if (!container) {
+        showToast(message);
+        return;
+    }
+
+    clearPlaybackOverlays();
+    hideLoadingMessage();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'retry-overlay';
+
+    const text = document.createElement('div');
+    text.textContent = message;
+    overlay.appendChild(text);
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Retry';
+    button.addEventListener('click', function () {
+        overlay.remove();
+        if (typeof onRetry === 'function') onRetry();
+    });
+    overlay.appendChild(button);
+
+    const browse = document.createElement('button');
+    browse.type = 'button';
+    browse.textContent = 'Browse channels';
+    browse.addEventListener('click', function () {
+        showPicker();
+    });
+    overlay.appendChild(browse);
+
+    container.appendChild(overlay);
+}
+
+/**
+ * Start media playback with muted autoplay fallback for mobile browsers
+ * @param {HTMLMediaElement} media
+ * @returns {Promise<void>}
+ */
+async function startPlaybackWithAutoplayFallback(media) {
+    try {
+        await media.play();
+        return;
+    } catch (_error) {
+        // Retry muted — common mobile autoplay policy
+        media.muted = true;
+        isMuted = true;
+        localStorage.setItem('myTV_isMuted', 'true');
+        updateMuteButtonIcon();
+        syncVolumeSliders();
+        await media.play();
+        showTapToUnmuteOverlay(media);
+    }
+}
+
+/**
+ * Prepare shared UI state when a stream begins
+ */
+function enterPlaybackUi() {
+    const channelPickerElement = document.getElementById('channelPicker');
+    if (channelPickerElement) {
+        channelPickerElement.hidden = true;
+    }
+
+    if (typeof setPlaybackChrome === 'function') {
+        setPlaybackChrome(true);
+    }
+
+    updateMuteButtonVisibility(false);
+    updateMuteButtonIcon();
+    isPickerVisible = false;
+
+    if (isMobileLayout() && isMenuVisible) {
+        closeSideMenu();
+    }
+}
+
+/**
  * Play a single HLS stream
  * @param {string} url - Stream URL
  * @returns {Promise} Resolves when playback starts
  */
 function playStream(url) {
     cleanupAllMedia();
+    clearPlaybackOverlays();
+
     return new Promise((resolve, reject) => {
         const videoElement = document.createElement('video');
         videoElement.className = 'video-element';
@@ -201,108 +328,82 @@ function playStream(url) {
         videoElement.autoplay = true;
         videoElement.muted = isMuted;
         videoElement.volume = currentVolume;
+        applyMobileMediaAttributes(videoElement);
 
         currentVideoElement = videoElement;
         currentAudioElement = null;
 
         const container = document.getElementById('videoContainer');
-        const channelPickerElement = document.getElementById('channelPicker');
-        const backButton = document.getElementById('backButton');
-        const muteButton = document.getElementById('muteButton');
+        let settled = false;
 
-        if (Hls.isSupported()) {
-            const hlsConfig = {
-                enableWorker: true,
-                lowLatencyMode: false,
-                liveSyncDuration: 25,
-                liveMaxLatencyDuration: 50,
-                maxBufferLength: 60,
-                maxMaxBufferLength: 120,
-                backBufferLength: 30,
-                maxBufferSize: 250 * 1000 * 1000,
-                maxBufferHole: 0.5,
-                manifestLoadingTimeOut: 10000,
-                manifestLoadingMaxRetry: 3,
-                levelLoadingTimeOut: 10000,
-                fragLoadingTimeOut: 20000,
-                fragLoadingMaxRetry: 3
-            };
+        const finalizeReject = (error) => {
+            if (settled) return;
+            settled = true;
+            hideLoadingMessage();
+            showRetryOverlay(error.message || 'Playback failed', () => {
+                playStream(url).then(resolve).catch(reject);
+            });
+            reject(error);
+        };
 
-            const hls = new Hls(hlsConfig);
+        const onReady = () => {
+            startPlaybackWithAutoplayFallback(videoElement)
+                .then(() => {
+                    if (settled) return;
+                    settled = true;
+                    hideLoadingMessage();
+                    startMemoryMonitor();
+                    resolve();
+                })
+                .catch((error) => finalizeReject(error));
+        };
+
+        if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+            const hls = new Hls(getHlsConfig());
             currentHlsVideoInstance = hls;
             hls.loadSource(url);
             hls.attachMedia(videoElement);
 
-            hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                videoElement.play()
-                    .then(() => {
-                        hideLoadingMessage();
-                        startMemoryMonitor();
-                        resolve();
-                    })
-                    .catch(error => {
-                        hideLoadingMessage();
-                        reject(error);
-                    });
-            });
+            hls.on(Hls.Events.MANIFEST_PARSED, onReady);
 
-            hls.on(Hls.Events.ERROR, function (event, data) {
-                if (data.fatal) {
-                    switch (data.type) {
-                        case Hls.ErrorTypes.NETWORK_ERROR:
-                            console.warn('Network error encountered, trying to recover...');
-                            hls.startLoad();
-                            break;
-                        case Hls.ErrorTypes.MEDIA_ERROR:
-                            console.warn('Media error encountered, trying to recover...');
-                            hls.recoverMediaError();
-                            break;
-                        default:
-                            cleanupHlsInstance(hls);
-                            if (currentHlsVideoInstance === hls) {
-                                currentHlsVideoInstance = null;
-                            }
-                            hideLoadingMessage();
-                            reject(new Error('HLS playback error: ' + (data.details || 'unknown')));
-                            break;
-                    }
+            hls.on(Hls.Events.ERROR, function (_event, data) {
+                if (!data.fatal) return;
+                switch (data.type) {
+                    case Hls.ErrorTypes.NETWORK_ERROR:
+                        console.warn('Network error encountered, trying to recover...');
+                        hls.startLoad();
+                        break;
+                    case Hls.ErrorTypes.MEDIA_ERROR:
+                        console.warn('Media error encountered, trying to recover...');
+                        hls.recoverMediaError();
+                        break;
+                    default:
+                        cleanupHlsInstance(hls);
+                        if (currentHlsVideoInstance === hls) {
+                            currentHlsVideoInstance = null;
+                        }
+                        finalizeReject(new Error('HLS playback error: ' + (data.details || 'unknown')));
+                        break;
                 }
             });
         } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
             videoElement.src = url;
-            videoElement.addEventListener('loadedmetadata', function () {
-                videoElement.play()
-                    .then(() => {
-                        hideLoadingMessage();
-                        resolve();
-                    })
-                    .catch(error => {
-                        hideLoadingMessage();
-                        reject(error);
-                    });
-            });
+            videoElement.addEventListener('loadedmetadata', onReady, { once: true });
+            videoElement.addEventListener('error', () => finalizeReject(new Error('Native HLS playback failed')), { once: true });
         } else {
-            hideLoadingMessage();
-            reject(new Error('HLS is not supported'));
+            finalizeReject(new Error('HLS is not supported in this browser'));
+            return;
         }
 
         if (container) {
             container.innerHTML = '';
             container.appendChild(videoElement);
+            container.hidden = false;
             container.style.display = 'block';
         }
-        if (channelPickerElement) {
-            channelPickerElement.style.display = 'none';
-        }
-        if (backButton) {
-            backButton.style.display = 'block';
-        }
 
-        updateMuteButtonVisibility(false);
-        updateMuteButtonIcon();
-
+        enterPlaybackUi();
         showLoadingMessage();
-        isPickerVisible = false;
     });
 }
 
@@ -333,8 +434,7 @@ function playVideoAndAudio(videoUrl, audioUrl, options = null) {
         videoElement.preload = 'auto';
         videoElement.muted = isMuted;
         videoElement.volume = currentVolume;
-        videoElement.setAttribute('playsinline', '');
-        videoElement.setAttribute('webkit-playsinline', '');
+        applyMobileMediaAttributes(videoElement);
 
         const audioElement = document.createElement('video');
         audioElement.style.display = 'none';
@@ -342,15 +442,12 @@ function playVideoAndAudio(videoUrl, audioUrl, options = null) {
         audioElement.preload = 'auto';
         audioElement.muted = isMuted;
         audioElement.volume = currentVolume;
-        audioElement.setAttribute('playsinline', '');
-        audioElement.setAttribute('webkit-playsinline', '');
+        applyMobileMediaAttributes(audioElement);
         currentVideoElement = videoElement;
         currentAudioElement = audioElement;
 
         const container = document.getElementById('videoContainer');
         const channelPicker = document.getElementById('channelPicker');
-        const backButton = document.getElementById('backButton');
-        const muteButton = document.getElementById('muteButton');
 
         let hlsVideo = null;
         let hlsAudio = null;
@@ -505,18 +602,14 @@ function playVideoAndAudio(videoUrl, audioUrl, options = null) {
             container.innerHTML = '';
             container.appendChild(videoElement);
             container.appendChild(audioElement);
+            container.hidden = false;
             container.style.display = 'block';
 
             if (channelPicker) {
-                channelPicker.style.display = 'none';
+                channelPicker.hidden = true;
             }
 
-            if (backButton) {
-                backButton.style.display = 'block';
-            }
-
-            updateMuteButtonVisibility(false);
-            updateMuteButtonIcon();
+            enterPlaybackUi();
             showLoadingMessage(loadingMessageText);
         };
 
@@ -561,7 +654,8 @@ function playVideoAndAudio(videoUrl, audioUrl, options = null) {
                 if (postReadyDelayMs > 0) {
                     await new Promise(resolveDelay => setTimeout(resolveDelay, postReadyDelayMs));
                 }
-                await videoElement.play();
+                await startPlaybackWithAutoplayFallback(videoElement);
+                audioElement.muted = videoElement.muted;
                 await audioElement.play();
 
                 startSyncMonitor();
@@ -576,20 +670,15 @@ function playVideoAndAudio(videoUrl, audioUrl, options = null) {
             }
         };
 
-        if (Hls.isSupported()) {
-            const hlsConfig = {
-                enableWorker: true,
-                lowLatencyMode: false,
+        if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+            const hlsConfig = getHlsConfig({
                 liveSyncDuration: 12,
                 liveMaxLatencyDuration: 30,
-                backBufferLength: 30,
-                maxBufferLength: 60,
-                maxMaxBufferLength: 120,
-                maxBufferSize: 150 * 1000 * 1000
-            };
+                maxBufferSize: shouldUseMobileHlsProfile() ? 60 * 1000 * 1000 : 150 * 1000 * 1000
+            });
 
             if (normalizedHeaders && typeof normalizedHeaders === 'object') {
-                hlsConfig.xhrSetup = function (xhr, url) {
+                hlsConfig.xhrSetup = function (xhr) {
                     try {
                         for (const key in normalizedHeaders) {
                             if (Object.prototype.hasOwnProperty.call(normalizedHeaders, key)) {

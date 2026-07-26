@@ -1,96 +1,155 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
+  <meta charset="UTF-8">
   <title>RENAN TV</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="google-site-verification" content="jDk1s6N-IOBTrNM4PV6WqMvZVyTrDHe8nv0tHPHHvaQ" />
-  <link rel="icon" href="https://i.imgur.com/opmOlZ5.png" type="image/x-icon">
-  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a1a2e">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <meta name="description" content="Live TV streaming app">
+  <link rel="icon" href="https://i.imgur.com/opmOlZ5.png" type="image/png">
+  <link rel="apple-touch-icon" href="https://i.imgur.com/opmOlZ5.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-
 </head>
 
-<body> <!-- Header -->
-  <div class="header">
+<body>
+  <a class="skip-link" href="#channelPicker">Skip to channels</a>
+
+  <header class="header" role="banner">
     <div class="header-left">
-      <div class="logo">RENAN TV</div>
-      <button id="backButton">← Back to Channels</button>
+      <button type="button" id="menuButton" class="icon-button" aria-label="Open channel categories" aria-controls="sideMenu" aria-expanded="false">
+        <span aria-hidden="true">☰</span>
+      </button>
+      <div class="logo" aria-label="RENAN TV">RENAN TV</div>
+      <button type="button" id="backButton" class="back-button" hidden>← Channels</button>
     </div>
+
     <div class="header-controls">
-      <button id="helpButton" title="Keyboard Shortcuts (?)">?</button>
-      <button id="muteButton" title="Toggle Mute">🔊</button>
-      <input type="range" id="volumeSlider" min="0" max="100" value="60" title="Volume">
-      <a id="supportButton" href="https://www.buymeacoffee.com/renanbazinin" target="_blank">
-        <button class="channel-button-support">Support Me</button>
-      </a>
+      <button type="button" id="helpButton" class="icon-button" aria-label="Help and shortcuts" title="Help">?</button>
+      <button type="button" id="muteButton" class="icon-button" aria-label="Mute" title="Mute" aria-pressed="false">🔊</button>
+      <label class="volume-control" for="volumeSlider">
+        <span class="visually-hidden">Volume</span>
+        <input type="range" id="volumeSlider" min="0" max="100" value="60" aria-valuemin="0" aria-valuemax="100" aria-valuenow="60" aria-label="Volume">
+      </label>
+      <button type="button" id="moreButton" class="icon-button more-button" aria-label="More options" aria-expanded="false" aria-controls="moreSheet">⋯</button>
+      <a id="supportButton" class="support-link" href="https://www.buymeacoffee.com/renanbazinin" target="_blank" rel="noopener noreferrer">Support</a>
     </div>
-  </div>
+  </header>
 
-  <!-- Main Container -->
+  <div id="drawerScrim" class="drawer-scrim" hidden aria-hidden="true"></div>
+
   <div class="main-container">
-    <!-- Side Menu -->
-    <div class="side-menu" id="sideMenu">
-      <div style="padding: 1rem 0; border-bottom: 1px solid var(--glass-border); margin-bottom: 1rem;">
-        <h3 style="margin: 0; color: var(--text-primary); font-size: 1.1rem; font-weight: 600;">Channel Categories</h3>
+    <nav class="side-menu hidden" id="sideMenu" aria-label="Channel categories" aria-hidden="true" inert>
+      <div class="side-menu-header">
+        <h2 class="side-menu-title">Categories</h2>
+        <button type="button" id="closeMenuButton" class="icon-button" aria-label="Close categories">×</button>
       </div>
-      <!-- Menu items will be populated here -->
-    </div>
+      <div id="categoryList" class="category-list"></div>
+      <div class="side-menu-divider"></div>
+      <h3 class="side-menu-subtitle">Channels</h3>
+      <div id="channelList" class="channel-list"></div>
+    </nav>
 
-    <!-- Content Area -->
-    <div class="content-area" id="contentArea">
-      <!-- Channel Picker -->
-      <div id="channelPicker">
+    <main class="content-area expanded" id="contentArea">
+      <section class="browser-toolbar" aria-label="Browse channels">
+        <div class="search-field">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <label class="visually-hidden" for="channelSearch">Search channels</label>
+          <input type="search" id="channelSearch" placeholder="Search channels" autocomplete="off" enterkeyhint="search">
+        </div>
+        <div id="categoryChips" class="category-chips" role="list" aria-label="Filter by category"></div>
+      </section>
+
+      <div id="channelPicker" aria-label="Channel grid">
         <div class="loading">Loading channels...</div>
       </div>
+    </main>
+  </div>
+
+  <div id="videoContainer" class="video-container" hidden></div>
+
+  <nav id="playerBar" class="player-bar" hidden aria-label="Playback controls">
+    <button type="button" id="prevChannelButton" class="player-bar-button" aria-label="Previous channel">‹</button>
+    <button type="button" id="browseChannelsButton" class="player-bar-button player-bar-primary" aria-label="Browse channels">Channels</button>
+    <button type="button" id="nextChannelButton" class="player-bar-button" aria-label="Next channel">›</button>
+  </nav>
+
+  <div id="moreSheet" class="more-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="moreSheetTitle">
+    <div class="more-sheet-panel">
+      <div class="more-sheet-header">
+        <h3 id="moreSheetTitle">Options</h3>
+        <button type="button" class="icon-button more-sheet-close" aria-label="Close options">×</button>
+      </div>
+      <div class="more-sheet-body">
+        <label class="more-volume" for="volumeSliderSheet">
+          <span>Volume</span>
+          <input type="range" id="volumeSliderSheet" min="0" max="100" value="60" aria-label="Volume">
+        </label>
+        <a class="more-sheet-link" href="https://www.buymeacoffee.com/renanbazinin" target="_blank" rel="noopener noreferrer">Support Me</a>
+        <button type="button" id="moreHelpButton" class="more-sheet-action">Keyboard & touch help</button>
+      </div>
     </div>
   </div>
-  <!-- Video Container -->
-  <div id="videoContainer"></div>
-  <div id="channel-input-display" class="hidden">
+
+  <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+
+  <div id="channel-input-display" class="channel-input-display hidden" aria-hidden="true">
     <span>_</span>
     <span>_</span>
   </div>
-  <div id="channel-info-overlay" class="hidden">
+
+  <div id="channel-info-overlay" class="channel-info-overlay hidden" aria-live="polite">
     <span class="channel-info-number"></span>
     <span class="channel-info-name"></span>
   </div>
-  <!-- Keyboard Shortcuts Help Modal -->
-  <div id="helpModal" class="help-modal-backdrop hidden">
+
+  <div id="helpModal" class="help-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
     <div class="help-modal">
       <div class="help-modal-header">
-        <h3>Keyboard Shortcuts</h3>
-        <button class="help-modal-close">&times;</button>
+        <h3 id="helpModalTitle">Help</h3>
+        <button type="button" class="help-modal-close icon-button" aria-label="Close help">&times;</button>
+      </div>
+      <div class="help-modal-tabs" role="tablist" aria-label="Help sections">
+        <button type="button" class="help-tab active" data-tab="touch" role="tab" aria-selected="true">Touch</button>
+        <button type="button" class="help-tab" data-tab="keyboard" role="tab" aria-selected="false">Keyboard</button>
       </div>
       <div class="help-modal-body">
-        <div class="help-shortcut"><kbd>0</kbd>-<kbd>9</kbd><span>Select channel by number (1-99)</span></div>
-        <div class="help-shortcut"><kbd>&uarr;</kbd><span>Previous channel</span></div>
-        <div class="help-shortcut"><kbd>&darr;</kbd><span>Next channel</span></div>
-        <div class="help-shortcut"><kbd>Backspace</kbd><span>Last watched channel</span></div>
-        <div class="help-shortcut"><kbd>H</kbd><span>Toggle channel picker</span></div>
-        <div class="help-shortcut"><kbd>Esc</kbd><span>Back to channels</span></div>
-        <div class="help-shortcut"><kbd>?</kbd><span>Show this help</span></div>
+        <div class="help-panel" data-panel="touch">
+          <div class="help-shortcut"><span class="help-key">Tap card</span><span>Play a channel</span></div>
+          <div class="help-shortcut"><span class="help-key">Browse</span><span>Return to channel grid</span></div>
+          <div class="help-shortcut"><span class="help-key">Prev / Next</span><span>Switch channels while watching</span></div>
+          <div class="help-shortcut"><span class="help-key">☰</span><span>Open categories and channel list</span></div>
+          <div class="help-shortcut"><span class="help-key">Search</span><span>Filter channels by name</span></div>
+        </div>
+        <div class="help-panel hidden" data-panel="keyboard">
+          <div class="help-shortcut"><kbd>0</kbd>-<kbd>9</kbd><span>Select channel by number (1-99)</span></div>
+          <div class="help-shortcut"><kbd>↑</kbd><span>Previous channel</span></div>
+          <div class="help-shortcut"><kbd>↓</kbd><span>Next channel</span></div>
+          <div class="help-shortcut"><kbd>Backspace</kbd><span>Last watched channel</span></div>
+          <div class="help-shortcut"><kbd>H</kbd><span>Toggle channel picker</span></div>
+          <div class="help-shortcut"><kbd>Esc</kbd><span>Back to channels</span></div>
+          <div class="help-shortcut"><kbd>?</kbd><span>Show this help</span></div>
+        </div>
       </div>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <!-- Modular JS files loaded in dependency order -->
-  <script src="js/state.js"></script>
-  <script src="js/utils.js"></script>
-  <script src="js/hls-player.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/channels.js"></script>
-  <script src="js/helperFetcher.js"></script>
-  <script src="js/keyboard.js"></script>
-  <script src="js/main.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js" defer></script>
+  <script src="js/state.js" defer></script>
+  <script src="js/utils.js" defer></script>
+  <script src="js/hls-player.js" defer></script>
+  <script src="js/ui.js" defer></script>
+  <script src="js/channels.js" defer></script>
+  <script src="js/helperFetcher.js" defer></script>
+  <script src="js/keyboard.js" defer></script>
+  <script src="js/main.js" defer></script>
   <script>
     if ('serviceWorker' in navigator) {
-      // updateViaCache:'none' = never serve sw.js itself from HTTP cache, so the
-      // worker is always re-checked. .update() forces an immediate check on load
-      // so a new worker (and its fresh code) takes over without manual clearing.
       navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
         .then((reg) => reg.update())
         .catch(() => {});
