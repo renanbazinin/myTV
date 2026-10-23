@@ -1,159 +1,416 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 
 <head>
   <meta charset="UTF-8">
   <title>RENAN TV</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="google-site-verification" content="jDk1s6N-IOBTrNM4PV6WqMvZVyTrDHe8nv0tHPHHvaQ" />
-  <meta name="theme-color" content="#1a1a2e">
+  <meta name="theme-color" content="#0b0d12">
+  <meta name="color-scheme" content="dark">
   <meta name="description" content="Live TV streaming app">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="RENAN TV">
   <link rel="icon" href="https://i.imgur.com/opmOlZ5.png" type="image/png">
   <link rel="apple-touch-icon" href="https://i.imgur.com/opmOlZ5.png">
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=6">
+  <script>
+    // Pick the TV layout before first paint so a TV never flashes the phone
+    // layout. Keep in sync with js/device.js.
+    (function () {
+      var html = document.documentElement;
+      var mode = 'auto';
+      try { mode = localStorage.getItem('myTV_layout_v1') || 'auto'; } catch (e) {}
+      var q = /[?&]tv=(1|0|true|false|on|off)\b/i.exec(location.search);
+      var ua = navigator.userAgent || '';
+      var tv;
+      if (q) {
+        tv = /^(1|true|on)$/i.test(q[1]);
+      } else if (mode === 'tv' || mode === 'standard') {
+        tv = mode === 'tv';
+      } else {
+        tv = /smart-?tv|smarttv|tizen|web0s|webos|netcast|bravia|hbbtv|viera|philipstv|nettv|android tv|googletv|google tv|crkey|roku|vidaa|titan|tv bro/i.test(ua) ||
+          /\bAFT[A-Z0-9]{1,6}\b/.test(ua) ||
+          (!!window.matchMedia && matchMedia('(pointer: none)').matches && matchMedia('(min-width: 900px)').matches);
+      }
+      if (tv && window.innerWidth >= window.innerHeight * 1.3) html.className += ' tv';
+      if (navigator.standalone === true) html.className += ' standalone';
+
+      // Boot watchdog: TVs have no devtools, so explain a blank screen
+      window.addEventListener('error', function (e) {
+        window.__tvErr = (e.message || '') + ' ' + (e.filename || '').split('/').pop() + ':' + (e.lineno || '');
+      });
+      window.__tvBoot = setTimeout(function () {
+        var box = document.getElementById('bootFail');
+        var detail = document.getElementById('bootFailDetail');
+        if (detail && window.__tvErr) detail.textContent = window.__tvErr;
+        if (box) box.hidden = false;
+        // TV remotes need focus on the only button
+        var reload = document.getElementById('bootFailReload');
+        if (reload) reload.focus();
+      }, 12000);
+
+    })();
+  </script>
 </head>
 
 <body>
-  <a class="skip-link" href="#channelPicker">Skip to channels</a>
+  <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="display:none" aria-hidden="true">
+    <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 6h-7.59l3.29-3.29L16 2l-4 4-4-4-.71.71L10.59 6H3a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8a2 2 0 0 0-2-2zm0 14H3V8h18v12zM9 10v8l7-4z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></symbol>
+    <symbol id="i-volume" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></symbol>
+    <symbol id="i-volume-off" viewBox="0 0 24 24"><path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.8 8.8 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></symbol>
+    <symbol id="i-star-outline" viewBox="0 0 24 24"><path d="m22 9.24-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.04 4.38.38-3.32 2.88 1 4.28L12 15.4z"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm0-6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm0 12a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM7 19h14v-2H7v2zm0-6h14v-2H7v2zm0-8v2h14V5H7z"/></symbol>
+    <symbol id="i-pip" viewBox="0 0 24 24"><path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z"/></symbol>
+    <symbol id="i-airplay" viewBox="0 0 24 24"><path d="M6 22h12l-6-6zM21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V5h18v12h-4v2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></symbol>
+    <symbol id="i-fullscreen" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></symbol>
+    <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><path d="M11 18h2v-2h-2v2zm1-16a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14a4 4 0 0 0-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5a4 4 0 0 0-4-4z"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
+    <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M20 3H4v10a4 4 0 0 0 4 4h6a4 4 0 0 0 4-4v-3h2a2 2 0 0 0 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z"/></symbol>
+    <symbol id="i-error" viewBox="0 0 24 24"><path d="M11 15h2v2h-2zm0-8h2v6h-2zm.99-5A10 10 0 1 0 12 22a10 10 0 0 0-.01-20zM12 20a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"/></symbol>
+  </svg>
 
-  <header class="header" role="banner">
-    <div class="header-left">
-      <button type="button" id="menuButton" class="icon-button" aria-label="Open channel categories" aria-controls="sideMenu" aria-expanded="false">
-        <span aria-hidden="true">☰</span>
-      </button>
-      <div class="logo" aria-label="RENAN TV">RENAN TV</div>
-      <button type="button" id="backButton" class="back-button" hidden>← Channels</button>
-    </div>
-
-    <div class="header-controls">
-      <button type="button" id="helpButton" class="icon-button" aria-label="Help and shortcuts" title="Help">?</button>
-      <button type="button" id="muteButton" class="icon-button" aria-label="Mute" title="Mute" aria-pressed="false">🔊</button>
-      <label class="volume-control" for="volumeSlider">
-        <span class="visually-hidden">Volume</span>
-        <input type="range" id="volumeSlider" min="0" max="100" value="60" aria-valuemin="0" aria-valuemax="100" aria-valuenow="60" aria-label="Volume">
-      </label>
-      <button type="button" id="moreButton" class="icon-button more-button" aria-label="More options" aria-expanded="false" aria-controls="moreSheet">⋯</button>
-      <a id="supportButton" class="support-link" href="https://www.buymeacoffee.com/renanbazinin" target="_blank" rel="noopener noreferrer">Support</a>
-    </div>
-  </header>
-
-  <div id="drawerScrim" class="drawer-scrim" hidden aria-hidden="true"></div>
-
-  <div class="main-container">
-    <nav class="side-menu hidden" id="sideMenu" aria-label="Channel categories" aria-hidden="true" inert>
-      <div class="side-menu-header">
-        <h2 class="side-menu-title">Categories</h2>
-        <button type="button" id="closeMenuButton" class="icon-button" aria-label="Close categories">×</button>
-      </div>
-      <div id="categoryList" class="category-list"></div>
-      <div class="side-menu-divider"></div>
-      <h3 class="side-menu-subtitle">Channels</h3>
-      <div id="channelList" class="channel-list"></div>
-    </nav>
-
-    <main class="content-area expanded" id="contentArea">
-      <section class="browser-toolbar" aria-label="Browse channels">
-        <div class="search-field">
-          <span class="search-icon" aria-hidden="true">⌕</span>
-          <label class="visually-hidden" for="channelSearch">Search channels</label>
-          <input type="search" id="channelSearch" placeholder="Search channels" autocomplete="off" enterkeyhint="search">
+  <div id="app">
+    <!-- Browse: channel guide -->
+    <div id="browse" class="view browse">
+      <header id="topbar" class="topbar">
+        <div class="topbar-row" data-nav-scroll-top>
+          <div class="brand">
+            <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="#i-tv" xlink:href="#i-tv"></use></svg></span>
+            <h1 class="brand-name">RENAN TV</h1>
+          </div>
+          <div id="searchBox" class="search" role="search">
+            <svg class="icon search-icon" aria-hidden="true"><use href="#i-search" xlink:href="#i-search"></use></svg>
+            <label class="visually-hidden" for="search">Search channels</label>
+            <input id="search" type="search" inputmode="search" placeholder="Search channels" autocomplete="off"
+              autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" data-nav>
+            <button id="searchClear" type="button" class="search-clear" aria-label="Clear search" hidden>
+              <svg class="icon" aria-hidden="true"><use href="#i-close" xlink:href="#i-close"></use></svg>
+            </button>
+          </div>
+          <div class="topbar-actions">
+            <span id="browseClock" class="clock" aria-hidden="true"></span>
+            <button id="searchToggle" type="button" class="icon-btn search-toggle" aria-label="Search"
+              aria-controls="searchBox" aria-expanded="false" data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-search" xlink:href="#i-search"></use></svg>
+            </button>
+            <button id="settingsButton" type="button" class="icon-btn" aria-label="Settings" aria-haspopup="dialog" data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-settings" xlink:href="#i-settings"></use></svg>
+            </button>
+          </div>
         </div>
-        <div id="categoryChips" class="category-chips" role="list" aria-label="Filter by category"></div>
-      </section>
+        <nav class="tabs" aria-label="Categories" data-nav-scroll-top>
+          <div id="categoryTabs" class="tabs-scroll" role="tablist" aria-label="Categories" data-nav-region="remember" data-nav-scroll-x></div>
+        </nav>
+      </header>
 
-      <div id="channelPicker" aria-label="Channel grid">
-        <div class="loading">Loading channels...</div>
+      <main id="browseMain" class="browse-main">
+        <button id="pipReturn" type="button" class="pip-return" data-nav hidden>
+          <span class="live-dot" aria-hidden="true"></span>
+          <span class="pip-return-text"><strong id="pipReturnName"></strong> is playing in picture-in-picture</span>
+          <span class="pip-return-cta">Return to player</span>
+        </button>
+        <section id="resume" class="resume" aria-label="Continue watching" data-nav-scroll-top hidden></section>
+        <div id="sections" class="sections" role="tabpanel" aria-label="Channels"></div>
+        <div id="browseStatus" class="browse-status"></div>
+      </main>
+    </div>
+
+    <!-- Watch: player -->
+    <div id="watch" class="view watch" hidden>
+      <div id="stage" class="stage">
+        <div id="videoHost" class="video-host">
+          <video id="video" class="video-element" playsinline webkit-playsinline x-webkit-airplay="allow" preload="none"></video>
+        </div>
+
+        <div id="tuning" class="tuning" hidden>
+          <div id="tuningLogo" class="tuning-logo"></div>
+          <div class="tuning-status"><span class="spinner" aria-hidden="true"></span><span>Tuning to <span id="tuningName"></span>…</span></div>
+        </div>
+        <div id="buffering" class="buffering" hidden><span class="spinner" aria-hidden="true"></span></div>
+
+        <button id="bigPlay" type="button" class="big-play" aria-label="Play" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-play" xlink:href="#i-play"></use></svg>
+        </button>
+
+        <div id="stageError" class="stage-error" role="alert" hidden>
+          <svg class="icon stage-error-icon" aria-hidden="true"><use href="#i-error" xlink:href="#i-error"></use></svg>
+          <p id="stageErrorTitle" class="stage-error-title"></p>
+          <p id="stageErrorText" class="stage-error-text"></p>
+          <div class="stage-error-actions">
+            <button id="retryButton" type="button" class="btn btn-primary" data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-refresh" xlink:href="#i-refresh"></use></svg><span>Try again</span>
+            </button>
+            <button id="errorNextButton" type="button" class="btn" data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-next" xlink:href="#i-next"></use></svg><span>Next channel</span>
+            </button>
+            <button id="errorGuideButton" type="button" class="btn" data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-list" xlink:href="#i-list"></use></svg><span>All channels</span>
+            </button>
+          </div>
+        </div>
+
+        <button id="unmutePill" type="button" class="unmute-pill" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-volume-off" xlink:href="#i-volume-off"></use></svg><span id="unmuteText">Tap for sound</span>
+        </button>
+
+        <div class="hud hud-top">
+          <button id="backButton" type="button" class="icon-btn hud-btn" aria-label="Back to channels" data-nav>
+            <svg class="icon" aria-hidden="true"><use href="#i-back" xlink:href="#i-back"></use></svg>
+          </button>
+          <div class="now">
+            <div id="nowLogo" class="now-logo" aria-hidden="true"></div>
+            <div class="now-text">
+              <div class="now-title"><span id="nowNumber" class="now-number"></span><span id="nowName" class="now-name"></span></div>
+              <div id="nowGroup" class="now-sub"></div>
+            </div>
+          </div>
+          <button id="liveButton" type="button" class="live-badge" aria-label="Live" data-nav>
+            <span class="live-dot" aria-hidden="true"></span><span id="liveButtonText">Live</span>
+          </button>
+          <span id="watchClock" class="clock" aria-hidden="true"></span>
+        </div>
+
+        <div class="hud hud-bottom">
+          <div class="controls" role="toolbar" aria-label="Playback controls">
+            <button id="prevButton" type="button" class="icon-btn hud-btn ctl-prev" aria-label="Previous channel" data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-prev" xlink:href="#i-prev"></use></svg>
+            </button>
+            <button id="playButton" type="button" class="icon-btn hud-btn hud-btn-primary ctl-play" aria-label="Pause" data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-pause" xlink:href="#i-pause"></use></svg>
+            </button>
+            <button id="nextButton" type="button" class="icon-btn hud-btn ctl-next" aria-label="Next channel" data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-next" xlink:href="#i-next"></use></svg>
+            </button>
+            <div class="volume ctl-volume">
+              <button id="muteButton" type="button" class="icon-btn hud-btn" aria-label="Mute" aria-pressed="false" data-nav>
+                <svg class="icon" aria-hidden="true"><use href="#i-volume" xlink:href="#i-volume"></use></svg>
+              </button>
+              <input id="volumeSlider" class="range volume-slider" type="range" min="0" max="100" step="1" value="60" aria-label="Volume" data-nav>
+            </div>
+            <span class="controls-spacer"></span>
+            <button id="favButton" type="button" class="icon-btn hud-btn ctl-fav" aria-label="Favorite" aria-pressed="false" data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-star-outline" xlink:href="#i-star-outline"></use></svg>
+            </button>
+            <button id="guideButton" type="button" class="icon-btn hud-btn ctl-guide" aria-label="Channel list" aria-controls="guide" aria-expanded="false" data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-list" xlink:href="#i-list"></use></svg>
+            </button>
+            <button id="airplayButton" type="button" class="icon-btn hud-btn ctl-airplay" aria-label="AirPlay" hidden data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-airplay" xlink:href="#i-airplay"></use></svg>
+            </button>
+            <button id="pipButton" type="button" class="icon-btn hud-btn ctl-pip" aria-label="Picture in picture" hidden data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-pip" xlink:href="#i-pip"></use></svg>
+            </button>
+            <button id="fullscreenButton" type="button" class="icon-btn hud-btn ctl-fullscreen" aria-label="Full screen" data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-fullscreen" xlink:href="#i-fullscreen"></use></svg>
+            </button>
+          </div>
+        </div>
       </div>
-    </main>
+
+      <aside id="guide" class="guide" aria-labelledby="guideTitle">
+        <!-- Phone portrait: now-playing strip docked under the video -->
+        <div class="dock">
+          <button id="dockPrev" type="button" class="icon-btn dock-btn" aria-label="Previous channel" data-nav>
+            <svg class="icon" aria-hidden="true"><use href="#i-prev" xlink:href="#i-prev"></use></svg>
+          </button>
+          <div class="dock-now">
+            <div id="dockLogo" class="dock-logo" aria-hidden="true"></div>
+            <div class="dock-text">
+              <div class="dock-title"><span id="dockNumber" class="now-number"></span><span id="dockName"></span></div>
+              <div class="dock-sub"><span class="live-badge live-badge-static"><span class="live-dot" aria-hidden="true"></span>Live</span><span id="dockGroup"></span></div>
+            </div>
+          </div>
+          <button id="dockFavButton" type="button" class="icon-btn dock-btn" aria-label="Favorite" aria-pressed="false" data-nav>
+            <svg class="icon" aria-hidden="true"><use href="#i-star-outline" xlink:href="#i-star-outline"></use></svg>
+          </button>
+          <button id="dockNext" type="button" class="icon-btn dock-btn" aria-label="Next channel" data-nav>
+            <svg class="icon" aria-hidden="true"><use href="#i-next" xlink:href="#i-next"></use></svg>
+          </button>
+        </div>
+        <div class="guide-header">
+          <h2 id="guideTitle" class="guide-title">Channels</h2>
+          <button id="guideClose" type="button" class="icon-btn" aria-label="Close channel list" data-nav>
+            <svg class="icon" aria-hidden="true"><use href="#i-close" xlink:href="#i-close"></use></svg>
+          </button>
+        </div>
+        <ol id="guideList" class="guide-list" aria-labelledby="guideTitle" data-nav-scroll-y></ol>
+      </aside>
+    </div>
   </div>
 
-  <div id="videoContainer" class="video-container" hidden></div>
-
-  <nav id="playerBar" class="player-bar" hidden aria-label="Playback controls">
-    <button type="button" id="prevChannelButton" class="player-bar-button" aria-label="Previous channel">‹</button>
-    <button type="button" id="browseChannelsButton" class="player-bar-button player-bar-primary" aria-label="Browse channels">Channels</button>
-    <button type="button" id="nextChannelButton" class="player-bar-button" aria-label="Next channel">›</button>
-  </nav>
-
-  <div id="moreSheet" class="more-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="moreSheetTitle">
-    <div class="more-sheet-panel">
-      <div class="more-sheet-header">
-        <h3 id="moreSheetTitle">Options</h3>
-        <button type="button" class="icon-button more-sheet-close" aria-label="Close options">×</button>
+  <!-- Settings -->
+  <div id="settingsSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
+    <div class="sheet-panel">
+      <div class="sheet-header">
+        <h2 id="settingsTitle" class="sheet-title">Settings</h2>
+        <button type="button" class="icon-btn sheet-close" aria-label="Close settings" data-nav>
+          <svg class="icon" aria-hidden="true"><use href="#i-close" xlink:href="#i-close"></use></svg>
+        </button>
       </div>
-      <div class="more-sheet-body">
-        <label class="more-volume" for="volumeSliderSheet">
-          <span>Volume</span>
-          <input type="range" id="volumeSliderSheet" min="0" max="100" value="60" aria-label="Volume">
-        </label>
-        <a class="more-sheet-link" href="https://www.buymeacoffee.com/renanbazinin" target="_blank" rel="noopener noreferrer">Support Me</a>
-        <button type="button" id="moreHelpButton" class="more-sheet-action">Keyboard & touch help</button>
+      <div class="sheet-body">
+        <div id="settingsVolumeRow" class="setting">
+          <label class="setting-label" for="settingsVolume">Volume</label>
+          <div class="setting-volume">
+            <button id="settingsMute" type="button" class="icon-btn" aria-label="Mute" aria-pressed="false" data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-volume" xlink:href="#i-volume"></use></svg>
+            </button>
+            <input id="settingsVolume" class="range" type="range" min="0" max="100" step="1" value="60" data-nav>
+          </div>
+        </div>
+        <div class="setting">
+          <span id="layoutLabel" class="setting-label">Layout</span>
+          <div class="segmented" role="radiogroup" aria-labelledby="layoutLabel">
+            <button type="button" class="segment" role="radio" data-layout="auto" data-nav>Auto</button>
+            <button type="button" class="segment" role="radio" data-layout="tv" data-nav>TV</button>
+            <button type="button" class="segment" role="radio" data-layout="standard" data-nav>Phone / PC</button>
+          </div>
+        </div>
+        <div class="setting setting-row">
+          <span class="setting-text">
+            <span id="autoplayLabel" class="setting-label">Start with last channel</span>
+            <span class="setting-hint">Open the app straight into what you watched last.</span>
+          </span>
+          <button id="autoplayToggle" type="button" class="switch" role="switch" aria-checked="false" aria-labelledby="autoplayLabel" data-nav>
+            <span class="switch-thumb"></span>
+          </button>
+        </div>
+        <div class="setting setting-row">
+          <span class="setting-text">
+            <span id="reverseZapLabel" class="setting-label">Reverse ▲ / ▼ zapping</span>
+            <span class="setting-hint">By default ▲ goes to the next channel (like CH +).</span>
+          </span>
+          <button id="reverseZapToggle" type="button" class="switch" role="switch" aria-checked="false" aria-labelledby="reverseZapLabel" data-nav>
+            <span class="switch-thumb"></span>
+          </button>
+        </div>
+        <div class="sheet-actions">
+          <button id="refreshChannels" type="button" class="btn" data-nav>
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh" xlink:href="#i-refresh"></use></svg><span>Refresh channels</span>
+          </button>
+          <button id="openHelp" type="button" class="btn" data-nav>
+            <svg class="icon" aria-hidden="true"><use href="#i-help" xlink:href="#i-help"></use></svg><span>Controls &amp; shortcuts</span>
+          </button>
+          <a id="supportLink" class="btn btn-support" href="https://www.buymeacoffee.com/renanbazinin" target="_blank" rel="noopener noreferrer" data-nav>
+            <svg class="icon" aria-hidden="true"><use href="#i-coffee" xlink:href="#i-coffee"></use></svg><span>Support me</span>
+          </a>
+        </div>
       </div>
     </div>
   </div>
 
-  <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
-
-  <div id="channel-input-display" class="channel-input-display hidden" aria-hidden="true">
-    <span>_</span>
-    <span>_</span>
-  </div>
-
-  <div id="channel-info-overlay" class="channel-info-overlay hidden" aria-live="polite">
-    <span class="channel-info-number"></span>
-    <span class="channel-info-name"></span>
-  </div>
-
-  <div id="helpModal" class="help-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
-    <div class="help-modal">
-      <div class="help-modal-header">
-        <h3 id="helpModalTitle">Help</h3>
-        <button type="button" class="help-modal-close icon-button" aria-label="Close help">&times;</button>
+  <!-- Help -->
+  <div id="helpSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
+    <div class="sheet-panel sheet-panel-wide">
+      <div class="sheet-header">
+        <h2 id="helpTitle" class="sheet-title">Controls &amp; shortcuts</h2>
+        <button type="button" class="icon-btn sheet-close" aria-label="Close help" data-nav>
+          <svg class="icon" aria-hidden="true"><use href="#i-close" xlink:href="#i-close"></use></svg>
+        </button>
       </div>
-      <div class="help-modal-tabs" role="tablist" aria-label="Help sections">
-        <button type="button" class="help-tab active" data-tab="touch" role="tab" aria-selected="true">Touch</button>
-        <button type="button" class="help-tab" data-tab="keyboard" role="tab" aria-selected="false">Keyboard</button>
+      <div class="help-tabs" role="tablist" aria-label="Input type">
+        <button type="button" class="help-tab" role="tab" id="helpTabRemote" aria-controls="helpRemote" data-tab="remote" data-nav>TV remote</button>
+        <button type="button" class="help-tab" role="tab" id="helpTabKeyboard" aria-controls="helpKeyboard" data-tab="keyboard" data-nav>Keyboard</button>
+        <button type="button" class="help-tab" role="tab" id="helpTabTouch" aria-controls="helpTouch" data-tab="touch" data-nav>Touch</button>
       </div>
-      <div class="help-modal-body">
-        <div class="help-panel" data-panel="touch">
-          <div class="help-shortcut"><span class="help-key">Tap card</span><span>Play a channel</span></div>
-          <div class="help-shortcut"><span class="help-key">Browse</span><span>Return to channel grid</span></div>
-          <div class="help-shortcut"><span class="help-key">Prev / Next</span><span>Switch channels while watching</span></div>
-          <div class="help-shortcut"><span class="help-key">☰</span><span>Open categories and channel list</span></div>
-          <div class="help-shortcut"><span class="help-key">Search</span><span>Filter channels by name</span></div>
-        </div>
-        <div class="help-panel hidden" data-panel="keyboard">
-          <div class="help-shortcut"><kbd>0</kbd>-<kbd>9</kbd><span>Select channel by number (1-99)</span></div>
-          <div class="help-shortcut"><kbd>↑</kbd><span>Previous channel</span></div>
-          <div class="help-shortcut"><kbd>↓</kbd><span>Next channel</span></div>
-          <div class="help-shortcut"><kbd>Backspace</kbd><span>Last watched channel</span></div>
-          <div class="help-shortcut"><kbd>H</kbd><span>Toggle channel picker</span></div>
-          <div class="help-shortcut"><kbd>Esc</kbd><span>Back to channels</span></div>
-          <div class="help-shortcut"><kbd>?</kbd><span>Show this help</span></div>
-        </div>
+      <div class="sheet-body help-body">
+        <dl id="helpRemote" class="help-list" role="tabpanel" aria-labelledby="helpTabRemote" data-panel="remote">
+          <div><dt>Arrows · OK</dt><dd>Move around and select</dd></div>
+          <div><dt>▲ / ▼ while watching</dt><dd>Next / previous channel</dd></div>
+          <div><dt>OK while watching</dt><dd>Channel list</dd></div>
+          <div><dt>◀ / ▶ while watching</dt><dd>Show the controls</dd></div>
+          <div><dt>Back</dt><dd>Close / back to the guide</dd></div>
+          <div><dt>CH + / CH −</dt><dd>Next / previous channel</dd></div>
+          <div><dt>0 – 9</dt><dd>Jump to a channel number</dd></div>
+          <div><dt>Yellow · Blue</dt><dd>Favorite · Channel list</dd></div>
+        </dl>
+        <dl id="helpKeyboard" class="help-list" role="tabpanel" aria-labelledby="helpTabKeyboard" data-panel="keyboard" hidden>
+          <div><dt><kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd></dt><dd>Move around the guide</dd></div>
+          <div><dt><kbd>↑</kbd> / <kbd>↓</kbd> while watching</dt><dd>Next / previous channel</dd></div>
+          <div><dt><kbd>Enter</kbd> while watching</dt><dd>Channel list</dd></div>
+          <div><dt><kbd>0</kbd>–<kbd>9</kbd></dt><dd>Jump to a channel number</dd></div>
+          <div><dt><kbd>Backspace</kbd></dt><dd>Last watched channel</dd></div>
+          <div><dt><kbd>Space</kbd> / <kbd>K</kbd></dt><dd>Play / pause</dd></div>
+          <div><dt><kbd>M</kbd> · <kbd>−</kbd> <kbd>+</kbd></dt><dd>Mute · volume</dd></div>
+          <div><dt><kbd>F</kbd> · <kbd>P</kbd></dt><dd>Full screen · picture-in-picture</dd></div>
+          <div><dt><kbd>S</kbd></dt><dd>Add or remove favorite</dd></div>
+          <div><dt><kbd>G</kbd></dt><dd>Channel list</dd></div>
+          <div><dt><kbd>L</kbd></dt><dd>Jump to live</dd></div>
+          <div><dt><kbd>/</kbd></dt><dd>Search</dd></div>
+          <div><dt><kbd>Esc</kbd></dt><dd>Close / back to the guide</dd></div>
+          <div><dt><kbd>?</kbd></dt><dd>This help</dd></div>
+        </dl>
+        <dl id="helpTouch" class="help-list" role="tabpanel" aria-labelledby="helpTabTouch" data-panel="touch" hidden>
+          <div><dt>Tap a channel</dt><dd>Start watching</dd></div>
+          <div><dt>Tap the video</dt><dd>Show or hide the controls</dd></div>
+          <div><dt>Swipe ← / → on the video</dt><dd>Next / previous channel</dd></div>
+          <div><dt>Rotate to landscape</dt><dd>Full-screen video</dd></div>
+          <div><dt>☆ or press and hold a channel</dt><dd>Add to favorites</dd></div>
+          <div><dt>Back gesture</dt><dd>Close / back to the guide</dd></div>
+        </dl>
       </div>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js" defer></script>
-  <script src="js/state.js" defer></script>
-  <script src="js/utils.js" defer></script>
-  <script src="js/hls-player.js" defer></script>
-  <script src="js/ui.js" defer></script>
-  <script src="js/channels.js" defer></script>
-  <script src="js/helperFetcher.js" defer></script>
-  <script src="js/keyboard.js" defer></script>
-  <script src="js/main.js" defer></script>
+  <div id="numberEntry" class="number-entry" aria-hidden="true" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+
+  <div id="bootFail" class="boot-fail" role="alert" hidden>
+    <p id="bootFailTitle" class="boot-fail-title">RENAN TV couldn't start on this browser.</p>
+    <p id="bootFailText">It needs a 2019 or newer Samsung TV, a 2020 or newer LG TV, or an up-to-date phone or computer browser.</p>
+    <p id="bootFailDetail" class="boot-fail-detail"></p>
+    <button id="bootFailReload" type="button" class="btn btn-primary" onclick="location.reload()">Reload</button>
+  </div>
+
+  <noscript><p class="noscript">RENAN TV needs JavaScript to play channels.</p></noscript>
+
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
-        .then((reg) => reg.update())
-        .catch(() => {});
-    }
+    // Entry point. Served over http(s) (GitHub Pages, localhost) the app runs
+    // as ES modules. Browsers refuse modules from file://, so a double-clicked
+    // index.html runs js/app.bundle.js instead: the same code, pre-bundled by
+    // `npm run build`. ?bundle=1 forces the bundle for testing.
+    (function () {
+      var script = document.createElement('script');
+      if (location.protocol === 'file:' || /[?&]bundle=1\b/.test(location.search)) {
+        script.src = 'js/app.bundle.js';
+        script.onerror = function () {
+          clearTimeout(window.__tvBoot);
+          document.getElementById('bootFailTitle').textContent = 'js/app.bundle.js is missing';
+          document.getElementById('bootFailText').textContent =
+            'Run "npm run build" in the myTV folder, or open the app through a web server ("npm start", then http://localhost:5173/).';
+          document.getElementById('bootFailReload').hidden = true;
+          document.getElementById('bootFail').hidden = false;
+        };
+      } else {
+        script.type = 'module';
+        script.src = 'js/main.js?v=6';
+      }
+      document.body.appendChild(script);
+    })();
+  </script>
+  <script nomodule>
+    clearTimeout(window.__tvBoot);
+    document.getElementById('bootFail').hidden = false;
+    document.getElementById('bootFailReload').focus();
   </script>
 </body>
 
