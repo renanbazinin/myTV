@@ -81,6 +81,8 @@
     <symbol id="i-airplay" viewBox="0 0 24 24"><path d="M6 22h12l-6-6zM21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V5h18v12h-4v2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></symbol>
     <symbol id="i-fullscreen" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></symbol>
     <symbol id="i-fullscreen-exit" viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></symbol>
+    <symbol id="i-cc" viewBox="0 0 24 24"><path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z"/></symbol>
+    <symbol id="i-cc-off" viewBox="0 0 24 24"><path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12zM7 15h3c.55 0 1-.45 1-1v-1H9.5v.5h-2v-3h2v.5H11v-1c0-.55-.45-1-1-1H7c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1zm7 0h3c.55 0 1-.45 1-1v-1h-1.5v.5h-2v-3h2v.5H18v-1c0-.55-.45-1-1-1h-3c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1z"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
     <symbol id="i-help" viewBox="0 0 24 24"><path d="M11 18h2v-2h-2v2zm1-16a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14a4 4 0 0 0-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5a4 4 0 0 0-4-4z"/></symbol>
     <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
@@ -140,6 +142,8 @@
         <div id="videoHost" class="video-host">
           <video id="video" class="video-element" playsinline webkit-playsinline x-webkit-airplay="allow" preload="none"></video>
         </div>
+
+        <div id="captions" class="captions" aria-hidden="true" hidden><span id="captionsText" class="captions-text"></span></div>
 
         <div id="tuning" class="tuning" hidden>
           <div id="tuningLogo" class="tuning-logo"></div>
@@ -212,6 +216,9 @@
             </button>
             <button id="guideButton" type="button" class="icon-btn hud-btn ctl-guide" aria-label="Channel list" aria-controls="guide" aria-expanded="false" data-nav>
               <svg class="icon" aria-hidden="true"><use href="#i-list" xlink:href="#i-list"></use></svg>
+            </button>
+            <button id="ccButton" type="button" class="icon-btn hud-btn ctl-cc" aria-label="Captions" aria-pressed="false" hidden data-nav>
+              <svg class="icon" aria-hidden="true"><use href="#i-cc-off" xlink:href="#i-cc-off"></use></svg>
             </button>
             <button id="airplayButton" type="button" class="icon-btn hud-btn ctl-airplay" aria-label="AirPlay" hidden data-nav>
               <svg class="icon" aria-hidden="true"><use href="#i-airplay" xlink:href="#i-airplay"></use></svg>
@@ -302,6 +309,15 @@
             <span class="switch-thumb"></span>
           </button>
         </div>
+        <div class="setting setting-row">
+          <span class="setting-text">
+            <span id="captionsLabel" class="setting-label">Captions</span>
+            <span class="setting-hint">Show subtitles on channels that have them (CC).</span>
+          </span>
+          <button id="captionsToggle" type="button" class="switch" role="switch" aria-checked="false" aria-labelledby="captionsLabel" data-nav>
+            <span class="switch-thumb"></span>
+          </button>
+        </div>
         <div class="sheet-actions">
           <button id="refreshChannels" type="button" class="btn" data-nav>
             <svg class="icon" aria-hidden="true"><use href="#i-refresh" xlink:href="#i-refresh"></use></svg><span>Refresh channels</span>
@@ -341,6 +357,7 @@
           <div><dt>CH + / CH −</dt><dd>Next / previous channel</dd></div>
           <div><dt>0 – 9</dt><dd>Jump to a channel number</dd></div>
           <div><dt>Yellow · Blue</dt><dd>Favorite · Channel list</dd></div>
+          <div><dt>CC button on screen</dt><dd>Captions on / off</dd></div>
         </dl>
         <dl id="helpKeyboard" class="help-list" role="tabpanel" aria-labelledby="helpTabKeyboard" data-panel="keyboard" hidden>
           <div><dt><kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd></dt><dd>Move around the guide</dd></div>
@@ -353,6 +370,7 @@
           <div><dt><kbd>F</kbd> · <kbd>P</kbd></dt><dd>Full screen · picture-in-picture</dd></div>
           <div><dt><kbd>S</kbd></dt><dd>Add or remove favorite</dd></div>
           <div><dt><kbd>G</kbd></dt><dd>Channel list</dd></div>
+          <div><dt><kbd>C</kbd></dt><dd>Captions on / off</dd></div>
           <div><dt><kbd>L</kbd></dt><dd>Jump to live</dd></div>
           <div><dt><kbd>/</kbd></dt><dd>Search</dd></div>
           <div><dt><kbd>Esc</kbd></dt><dd>Close / back to the guide</dd></div>
@@ -402,7 +420,7 @@
         };
       } else {
         script.type = 'module';
-        script.src = 'js/main.js?v=6';
+        script.src = 'js/main.js?v=7';
       }
       document.body.appendChild(script);
     })();

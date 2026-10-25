@@ -1158,6 +1158,54 @@ html:not(.tv) .skeleton-line {
   cursor: none;
 }
 
+/* Captions: drawn over the video (above the controls' gradient, which would
+ * dim them) and lifted clear of the control bar while it shows */
+.captions {
+  position: absolute;
+  right: 5%;
+  bottom: 5%;
+  bottom: calc(5% + var(--safe-bottom));
+  left: 5%;
+  z-index: 11;
+  text-align: center;
+  pointer-events: none;
+  transition: bottom 0.22s var(--ease), top 0.22s var(--ease);
+}
+
+.watch:not(.is-idle) .captions {
+  bottom: 4.75rem;
+  bottom: calc(4.75rem + var(--safe-bottom));
+}
+
+/* The broadcaster placed them at the top (clear of its headline bar) */
+.captions.is-top {
+  top: 5%;
+  top: calc(5% + var(--safe-top));
+  bottom: auto;
+}
+
+.watch:not(.is-idle) .captions.is-top {
+  top: 4.25rem;
+  top: calc(4.25rem + var(--safe-top));
+  bottom: auto;
+}
+
+.captions-text {
+  padding: 0.1em 0.45em;
+  border-radius: 0.2em;
+  background-color: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 1.1rem;
+  font-size: calc(0.6rem + 1.8vh);
+  font-weight: 500;
+  line-height: 1.55;
+  white-space: pre-line;
+  /* Each line takes the direction of its own text (Hebrew / Arabic) */
+  unicode-bidi: plaintext;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
 /* HUD */
 .hud {
   position: absolute;
@@ -1245,6 +1293,26 @@ html:not(.tv) .skeleton-line {
 
 #muteButton[aria-pressed='true'] {
   color: #fca5a5;
+}
+
+.ctl-cc {
+  position: relative;
+}
+
+/* Captions on: filled glyph with a bar under it */
+.ctl-cc[aria-pressed='true'] {
+  color: var(--text);
+}
+
+.ctl-cc[aria-pressed='true']::after {
+  content: '';
+  position: absolute;
+  right: 30%;
+  bottom: 16%;
+  left: 30%;
+  height: 2px;
+  border-radius: 1px;
+  background-color: var(--accent-text);
 }
 
 .now {
@@ -1775,6 +1843,7 @@ html:not(.tv) .skeleton-line {
 
   .ctl-fav,
   .ctl-guide,
+  .ctl-cc,
   .ctl-airplay,
   .ctl-pip,
   .ctl-fullscreen {
@@ -1866,6 +1935,20 @@ html:not(.tv) .skeleton-line {
   html:not(.tv) .unmute-pill {
     left: 0.5rem;
     bottom: 3.6rem;
+  }
+
+  html:not(.tv) .watch:not(.is-idle) .captions {
+    bottom: 3.75rem;
+  }
+
+  html:not(.tv) .watch:not(.is-idle) .captions.is-top {
+    top: 3.5rem;
+    bottom: auto;
+  }
+
+  html:not(.tv) .captions-text {
+    font-size: 0.95rem;
+    font-size: calc(0.5rem + 1.8vw);
   }
 
   html:not(.tv) .tuning-logo {
@@ -2734,6 +2817,31 @@ html.tv {
 .tv .unmute-pill {
   left: 4rem;
   bottom: 6.75rem;
+}
+
+/* Inside the overscan-safe area */
+.tv .captions {
+  right: 4rem;
+  bottom: 6%;
+  left: 4rem;
+}
+
+.tv .watch:not(.is-idle) .captions {
+  bottom: 6.25rem;
+}
+
+.tv .captions.is-top {
+  top: 6%;
+  bottom: auto;
+}
+
+.tv .watch:not(.is-idle) .captions.is-top {
+  top: 5.75rem;
+  bottom: auto;
+}
+
+.tv .captions-text {
+  font-size: 1.45rem;
 }
 
 .tv.watch-open .toast {
