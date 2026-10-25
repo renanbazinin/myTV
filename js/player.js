@@ -9,9 +9,11 @@
 //   player:autoplay-muted      player:blocked (needs a Play press)
 //   player:memory-warning      player:stopped
 //   player:pip {active}        player:airplay {available}
+// Captions (captions.js): player:captions, player:caption-text {text, top}
 
 import { state, emit, persistVolume } from './store.js';
 import { DEFAULT_VOLUME, TUNE_TIMEOUT_MS, HLS_JS_URL } from './config.js';
+import { attachCaptions, resetCaptions, bindHls as bindHlsCaptions, useNativeTracks } from './captions.js';
 
 let video = null;
 let profile = 'auto';
@@ -107,6 +109,7 @@ export function initPlayer(videoElement, options) {
     }
 
     document.addEventListener('visibilitychange', onVisibilityChange);
+    attachCaptions(video);
 }
 
 export function getVideo() {
@@ -256,7 +259,10 @@ function getHlsConfig(overrides) {
         // Don't pull 1080p into a 220px-tall phone player
         capLevelToPlayerSize: true,
         maxDevicePixelRatio: saveData ? 1 : 2,
-        startLevel: saveData ? 0 : undefined
+        startLevel: saveData ? 0 : undefined,
+        // Captions come to captions.js as cues: TextTracks hls.js adds to the
+        // persistent <video> could never be removed again
+        renderTextTracksNatively: false
     }, base, overrides || {});
 }
 
@@ -317,6 +323,7 @@ function teardownStream() {
         audioElement = null;
     }
     resetMedia(video);
+    resetCaptions();
     engine = null;
     nativeUrl = null;
     started = false;
@@ -557,6 +564,7 @@ export function play(url) {
                 safePlay(video).catch(() => {});
             };
             video.src = url;
+            useNativeTracks();
             startPlay(id, fail);
         };
 
@@ -589,6 +597,7 @@ export function play(url) {
             const hls = new Hls(getHlsConfig());
             hlsVideo = hls;
             attachErrorRecovery(hls, fail);
+            bindHlsCaptions(hls);
             hls.attachMedia(video);
             hls.loadSource(url);
             startPlay(id, fail);

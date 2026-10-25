@@ -1,7 +1,7 @@
-// settings.js - Settings sheet: volume, layout, start-up and zapping options
+// settings.js - Settings sheet: volume, layout, start-up, zapping and captions options
 
 import { $, $$ } from '../dom.js';
-import { state, emit, setLayoutPreference, setAutoplayLast, setReverseZap } from '../store.js';
+import { state, emit, setLayoutPreference, setAutoplayLast, setReverseZap, setCaptionsPreference } from '../store.js';
 import * as player from '../player.js';
 import { openSheet, openHelp, closeSheet } from './overlays.js';
 import { isTvMode, isCoarsePointer } from '../device.js';
@@ -30,6 +30,7 @@ export function openSettings() {
     renderLayout();
     renderSwitch(els.autoplay, state.autoplayLast);
     renderSwitch(els.reverseZap, state.reverseZap);
+    renderSwitch(els.captions, !!state.captions);
     // TV volume is the TV's; iOS volume is the hardware buttons
     els.volumeRow.hidden = isTvMode() || !player.volumeWritable();
     openSheet(els.sheet);
@@ -43,6 +44,7 @@ export function initSettings() {
         volumeRow: $('#settingsVolumeRow'),
         autoplay: $('#autoplayToggle'),
         reverseZap: $('#reverseZapToggle'),
+        captions: $('#captionsToggle'),
         refresh: $('#refreshChannels'),
         help: $('#openHelp')
     };
@@ -73,6 +75,11 @@ export function initSettings() {
         setReverseZap(!state.reverseZap);
         renderSwitch(els.reverseZap, state.reverseZap);
         emit('zap-direction');
+    });
+
+    els.captions.addEventListener('click', () => {
+        setCaptionsPreference(state.captions ? '' : 'on');
+        renderSwitch(els.captions, !!state.captions);
     });
 
     els.refresh.addEventListener('click', () => {

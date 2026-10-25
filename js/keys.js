@@ -25,6 +25,7 @@ const BY_KEY = {
     MediaPlayPause: 'play-pause', MediaPlay: 'play', MediaPause: 'pause', MediaStop: 'stop',
     ColorF0Red: 'red', ColorF1Green: 'green', ColorF2Yellow: 'yellow', ColorF3Blue: 'blue',
     Info: 'info', Guide: 'guide', ContextMenu: 'menu',
+    ClosedCaptionToggle: 'captions', Subtitle: 'captions',
     AudioVolumeMute: 'system-volume', VolumeMute: 'system-volume',
     AudioVolumeUp: 'system-volume', VolumeUp: 'system-volume',
     AudioVolumeDown: 'system-volume', VolumeDown: 'system-volume'

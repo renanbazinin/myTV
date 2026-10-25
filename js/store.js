@@ -89,7 +89,9 @@ export const state = {
     lastChannelKey: readStorage(STORAGE_KEYS.lastChannel, null),
     layout: readStorage(STORAGE_KEYS.layout, 'auto'),
     autoplayLast: readStorage(STORAGE_KEYS.autoplayLast, 'false') === 'true',
-    reverseZap: readStorage(STORAGE_KEYS.reverseZap, 'false') === 'true'
+    reverseZap: readStorage(STORAGE_KEYS.reverseZap, 'false') === 'true',
+    // '' = off, otherwise the preferred language ('en') or 'on' for any
+    captions: readStorage(STORAGE_KEYS.captions, '') || ''
 };
 
 if (!Array.isArray(state.favorites)) {
@@ -220,4 +222,16 @@ export function setAutoplayLast(value) {
 export function setReverseZap(value) {
     state.reverseZap = !!value;
     writeStorage(STORAGE_KEYS.reverseZap, state.reverseZap);
+}
+
+/**
+ * Captions for every channel: '' = off, a language ('en') or 'on' for any
+ * @param {string} value
+ */
+export function setCaptionsPreference(value) {
+    const next = value ? String(value) : '';
+    if (next === state.captions) return;
+    state.captions = next;
+    writeStorage(STORAGE_KEYS.captions, next);
+    emit('captions-pref', next);
 }

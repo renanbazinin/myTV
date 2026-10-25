@@ -9,6 +9,7 @@
 import { h, icon, setIcon, $, $$, isVisible } from '../dom.js';
 import { state, emit, on, isFavorite, toggleFavorite, setLastChannel, findChannelByKey } from '../store.js';
 import * as player from '../player.js';
+import { captionTracks, selectedCaptionTrack, cycleCaptions } from '../captions.js';
 import { resolveStreamUrl, needsResolver, toAvcUrl } from '../streams.js';
 import { openLayer, closeLayer, isOpen, back as layerBack, backFromRemote } from '../layers.js';
 import { pushScope, popScope, move, focusElement, focusQuietly, isKeyboardMode } from '../nav.js';
@@ -191,6 +192,23 @@ function renderCapabilities() {
     els.fullscreenButton.setAttribute('aria-label', full ? 'Exit full screen' : 'Full screen');
     setIcon(els.fullscreenButton, full ? 'fullscreen-exit' : 'fullscreen');
     els.watch.classList.toggle('is-fullscreen', full);
+}
+
+/** The CC button shows only while the stream has captions */
+function renderCaptionsButton() {
+    const tracks = captionTracks();
+    const current = selectedCaptionTrack();
+    els.ccButton.hidden = !tracks.length;
+    els.ccButton.setAttribute('aria-pressed', current ? 'true' : 'false');
+    els.ccButton.setAttribute('aria-label', current && tracks.length > 1 ? `Captions: ${current.label}` : 'Captions');
+    setIcon(els.ccButton, current ? 'cc' : 'cc-off');
+}
+
+function renderCaptionText(payload) {
+    const text = (payload && payload.text) || '';
+    els.captionsText.textContent = text;
+    els.captions.hidden = !text;
+    els.captions.classList.toggle('is-top', !!(payload && payload.top));
 }
 
 function renderLive() {
@@ -796,6 +814,23 @@ function unmuteFromGesture() {
     showHud();
 }
 
+/**
+ * Captions off -> on (-> the next language, when there are several) -> off
+ */
+function toggleCaptions() {
+    const count = captionTracks().length;
+    if (!count) {
+        showToast('No captions on this channel', 2000);
+        return;
+    }
+    const track = cycleCaptions();
+    if (!track) {
+        showToast('Captions off', 1500);
+    } else {
+        showToast(count > 1 ? `Captions: ${track.label}` : 'Captions on', 1500);
+    }
+}
+
 function nudgeVolume(delta) {
     if (isTvMode()) return;
     player.nudgeVolume(delta);
@@ -916,8 +951,11 @@ export function handleWatchKey(action, event) {
         case 'blue':
         case 'guide':
         case 'char:g':
-        case 'char:c':
             toggleGuide();
+            return true;
+        case 'captions':
+        case 'char:c':
+            toggleCaptions();
             return true;
         case 'info':
         case 'green':
@@ -1169,6 +1207,8 @@ function bindPlayerEvents() {
         airplayAvailable = !!(payload && payload.available);
         renderCapabilities();
     });
+    on('player:captions', renderCaptionsButton);
+    on('player:caption-text', renderCaptionText);
     on('favorites', () => {
         renderFavorite();
         updateGuideStars();
@@ -1201,6 +1241,7 @@ function bindControls() {
     els.favButton.addEventListener('click', toggleFavoriteCurrent);
     els.dockFavButton.addEventListener('click', toggleFavoriteCurrent);
     els.guideButton.addEventListener('click', toggleGuide);
+    els.ccButton.addEventListener('click', toggleCaptions);
     els.guideClose.addEventListener('click', closeGuide);
     els.pipButton.addEventListener('click', () => togglePip(player.getVideo()));
     els.airplayButton.addEventListener('click', () => player.showAirplayPicker());
@@ -1265,6 +1306,8 @@ export function initWatch() {
     els = {
         watch: $('#watch'),
         stage: $('#stage'),
+        captions: $('#captions'),
+        captionsText: $('#captionsText'),
         tuning: $('#tuning'),
         tuningLogo: $('#tuningLogo'),
         tuningName: $('#tuningName'),
@@ -1292,6 +1335,7 @@ export function initWatch() {
         volumeSlider: $('#volumeSlider'),
         favButton: $('#favButton'),
         guideButton: $('#guideButton'),
+        ccButton: $('#ccButton'),
         airplayButton: $('#airplayButton'),
         pipButton: $('#pipButton'),
         fullscreenButton: $('#fullscreenButton'),

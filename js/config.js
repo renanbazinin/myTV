@@ -18,6 +18,7 @@ export const STORAGE_KEYS = {
     layout: 'myTV_layout_v1',
     autoplayLast: 'myTV_autoplayLast_v1',
     reverseZap: 'myTV_reverseZap_v1',
+    captions: 'myTV_captions_v1',
     category: 'myTV_category_v1',
     playlistCache: 'myTV_m3u_cache_v2'
 };
