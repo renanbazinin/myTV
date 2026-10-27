@@ -4,7 +4,7 @@
 // because GitHub Pages sends max-age=600: without that, a browser could mix
 // old and new ES modules for 10 minutes after a deploy and fail to start.
 
-const CACHE_VERSION = 'renan-tv-v7-captions';
+const CACHE_VERSION = 'renan-tv-v8-stall-recovery';
 const STATIC_ASSETS = [
   './',
   './index.html',

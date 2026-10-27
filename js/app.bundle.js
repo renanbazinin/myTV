@@ -755,13 +755,22 @@
   var armTuneTimer = null;
   var memoryTimer = null;
   var syncTimer = null;
-  var nativeStallTimer = null;
   var forcedMute = false;
   var pausedAt = 0;
   var blessed = false;
   var stoppedWhileHidden = false;
   var lastMemoryWarning = 0;
   var hlsPromise = null;
+  var watchdogTimer = null;
+  var onSessionStall = null;
+  var onSessionResume = null;
+  var wantPlaying = false;
+  var buffering = false;
+  var progressAt = 0;
+  var progressPos = 0;
+  var lastTickAt = 0;
+  var stallStep = 0;
+  var restartTimes = [];
   function initPlayer(videoElement, options) {
     video2 = videoElement;
     profile = options && options.profile || "auto";
@@ -774,29 +783,36 @@
     applyVolume(true);
     const current = () => activeSession !== 0 && activeSession === session;
     video2.addEventListener("playing", () => {
-      clearTimeout(nativeStallTimer);
       if (!current()) return;
       pausedAt = 0;
       if (onSessionPlaying) onSessionPlaying();
-      emit("player:buffering", { active: false });
+      markProgress();
+      setBuffering(false);
     });
     video2.addEventListener("waiting", () => {
       if (!current() || !started) return;
-      emit("player:buffering", { active: true });
-      if (engine2 === "native") {
-        clearTimeout(nativeStallTimer);
-        nativeStallTimer = setTimeout(() => {
-          if (current() && !video2.paused && onSessionNativeError) onSessionNativeError("stall");
-        }, 8e3);
-      }
+      setBuffering(true);
+    });
+    video2.addEventListener("timeupdate", () => {
+      if (current() && started && notePlayhead()) setBuffering(false);
     });
     video2.addEventListener("play", () => {
-      if (current()) emit("player:state", { paused: false });
+      if (!current()) return;
+      wantPlaying = true;
+      if (stoppedWhileHidden && hlsVideo) {
+        stoppedWhileHidden = false;
+        try {
+          hlsVideo.startLoad(-1);
+        } catch (_error) {
+        }
+      }
+      emit("player:state", { paused: false });
     });
     video2.addEventListener("pause", () => {
-      clearTimeout(nativeStallTimer);
       if (!current()) return;
+      wantPlaying = false;
       if (started && !pausedAt) pausedAt = Date.now();
+      setBuffering(false);
       emit("player:state", { paused: true });
     });
     video2.addEventListener("error", () => {
@@ -932,7 +948,13 @@
       startLevel: saveData ? 0 : void 0,
       // Captions come to captions.js as cues: TextTracks hls.js adds to the
       // persistent <video> could never be removed again
-      renderTextTracksNatively: false
+      renderTextTracksNatively: false,
+      // Some CDNs (Keshet 12's) now and then serve a live playlist that
+      // doesn't line up with the previous one ("media sequence mismatch").
+      // hls.js 1.6 then stops refreshing that playlist for good; for the
+      // only audio rendition that freezes the picture minutes later, with
+      // no fatal error. Keep refreshing instead.
+      ignorePlaylistParsingErrors: true
     }, base, overrides || {});
   }
   function safePlay(media) {
@@ -950,8 +972,8 @@
     memoryTimer = null;
     clearInterval(syncTimer);
     syncTimer = null;
-    clearTimeout(nativeStallTimer);
-    nativeStallTimer = null;
+    clearInterval(watchdogTimer);
+    watchdogTimer = null;
   }
   function destroyHls(instance) {
     if (!instance) return;
@@ -996,9 +1018,15 @@
     started = false;
     onSessionPlaying = null;
     onSessionNativeError = null;
+    onSessionStall = null;
+    onSessionResume = null;
     armTuneTimer = null;
     stoppedWhileHidden = false;
     pausedAt = 0;
+    wantPlaying = false;
+    stallStep = 0;
+    restartTimes = [];
+    setBuffering(false);
   }
   function blockStart() {
     clearTimeout(tuneTimer);
@@ -1046,31 +1074,111 @@
       }
     }, 3e4);
   }
+  var STALL_SPINNER_MS = 3e3;
+  var STALL_RESUME_MS = 2e3;
+  var STALL_STEP_MS = [8e3, 18e3, 4e4];
+  var MAX_RESTARTS = 3;
+  var RESTART_WINDOW_MS = 10 * 60 * 1e3;
+  function setBuffering(active) {
+    if (buffering === active) return;
+    buffering = active;
+    emit("player:buffering", { active });
+  }
+  function isBuffering() {
+    return buffering;
+  }
+  function markProgress() {
+    progressPos = video2.currentTime;
+    progressAt = Date.now();
+    stallStep = 0;
+  }
+  function notePlayhead() {
+    const position = video2.currentTime;
+    const delta = position - progressPos;
+    if (video2.seeking || Math.abs(delta) < 0.1) return false;
+    progressPos = position;
+    if (delta < 0 || delta > 5 || video2.paused || video2.readyState < 2) return false;
+    progressAt = Date.now();
+    stallStep = 0;
+    return true;
+  }
+  function bufferedAhead() {
+    const ranges = video2.buffered;
+    const position = video2.currentTime;
+    for (let i = 0; i < ranges.length; i++) {
+      if (ranges.start(i) <= position + 0.1 && position < ranges.end(i)) {
+        return ranges.end(i) - position;
+      }
+    }
+    return 0;
+  }
+  function inPictureInPicture() {
+    return document.pictureInPictureElement === video2 || video2.webkitPresentationMode === "picture-in-picture";
+  }
+  function startWatchdog() {
+    clearInterval(watchdogTimer);
+    markProgress();
+    lastTickAt = Date.now();
+    watchdogTimer = setInterval(checkStall, 1e3);
+  }
+  function checkStall() {
+    if (!isActive() || !started) return;
+    const now = Date.now();
+    const late = now - lastTickAt > 3e3;
+    lastTickAt = now;
+    if (notePlayhead()) {
+      setBuffering(false);
+      return;
+    }
+    if (!wantPlaying || document.hidden && !inPictureInPicture() || video2.webkitCurrentPlaybackTargetIsWireless || late) {
+      markProgress();
+      return;
+    }
+    const stalled = now - progressAt;
+    if (stalled >= STALL_SPINNER_MS) setBuffering(true);
+    if (video2.paused && stalled >= STALL_RESUME_MS && onSessionResume) {
+      onSessionResume();
+    }
+    if (stallStep < STALL_STEP_MS.length && stalled >= STALL_STEP_MS[stallStep]) {
+      stallStep += 1;
+      if (onSessionStall) onSessionStall(stallStep);
+    }
+  }
   function attachErrorRecovery(hls2, fail) {
     const Hls = window.Hls;
     let networkRetries = 0;
+    let lastNetworkError = 0;
     let mediaRetries = 0;
     let lastMediaError = 0;
-    hls2.on(Hls.Events.FRAG_LOADED, () => {
-      networkRetries = 0;
-    });
     hls2.on(Hls.Events.ERROR, (_event, data) => {
-      if (!data || !data.fatal) return;
+      if (!data || !data.fatal || hls2 !== hlsVideo) return;
       const details = data.details || "unknown";
       if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-        const loadFailure = /manifest/i.test(details) || !started && /level/i.test(details);
-        if (loadFailure || networkRetries >= 3) {
-          fail(new Error(started ? "Lost connection to the stream." : "This channel is not available right now."));
+        const now = Date.now();
+        if (now - lastNetworkError > 6e4) networkRetries = 0;
+        lastNetworkError = now;
+        if (!started) {
+          if (/manifest|level/i.test(details) || networkRetries >= 3) {
+            fail(new Error("This channel is not available right now."));
+            return;
+          }
+        } else if (networkRetries >= 20) {
+          fail(new Error("Lost connection to the stream."));
           return;
         }
         networkRetries += 1;
         console.warn(`[player] Network error (${details}), retry ${networkRetries}`);
         setTimeout(() => {
+          if (hls2 !== hlsVideo) return;
           try {
-            hls2.startLoad();
+            if (/manifest/i.test(details)) {
+              hls2.loadSource(hls2.url);
+            } else {
+              hls2.startLoad();
+            }
           } catch (_error) {
           }
-        }, 1e3 * Math.pow(2, networkRetries - 1));
+        }, Math.min(8e3, 1e3 * Math.pow(2, networkRetries - 1)));
         return;
       }
       if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -1078,7 +1186,7 @@
           fail(codedError("This stream could not be decoded on this device.", "codecs"));
           return;
         }
-        const resume = !started || !video2.paused;
+        const resume = !started || wantPlaying;
         const now = Date.now();
         mediaRetries = now - lastMediaError < 3e3 ? mediaRetries + 1 : 1;
         lastMediaError = now;
@@ -1153,9 +1261,37 @@
         clearTimeout(tuneTimer);
         emit("player:playing");
         startMemoryMonitor();
+        startWatchdog();
         if (!settled) {
           settled = true;
           resolve();
+        }
+      };
+      onSessionResume = () => startPlay(id, fail);
+      onSessionStall = (step) => {
+        if (step >= STALL_STEP_MS.length) {
+          fail(new Error("Lost connection to the stream."));
+        } else if (engine2 === "native") {
+          if (onSessionNativeError) onSessionNativeError("stall");
+        } else if (step === 1 && hlsVideo) {
+          if (bufferedAhead() >= 1) {
+            console.warn("[player] Stalled with media buffered, resetting playback");
+            hlsVideo.recoverMediaError();
+            startPlay(id, fail);
+          } else {
+            console.warn("[player] Stalled waiting for media, reloading");
+            hlsVideo.startLoad();
+          }
+        } else if (hlsVideo) {
+          const now = Date.now();
+          restartTimes = restartTimes.filter((time) => now - time < RESTART_WINDOW_MS);
+          if (restartTimes.length >= MAX_RESTARTS) {
+            fail(new Error("Lost connection to the stream."));
+            return;
+          }
+          restartTimes.push(now);
+          console.warn("[player] Still stalled, restarting the stream");
+          startHls(window.Hls);
         }
       };
       const startNative = () => {
@@ -1205,6 +1341,10 @@
           return;
         }
         engine2 = "hlsjs";
+        if (hlsVideo) {
+          destroyHls(hlsVideo);
+          resetCaptions();
+        }
         const hls2 = new Hls(getHlsConfig());
         hlsVideo = hls2;
         attachErrorRecovery(hls2, fail);
@@ -1291,6 +1431,7 @@
       } catch (_error) {
       }
     }
+    if (started) markProgress();
     if (!video2.paused && isBehindLive()) {
       jumpToLive();
     }
@@ -3077,10 +3218,8 @@
   function setTuning(active) {
     tuning = active;
     els2.tuning.hidden = !active;
-    if (active) {
-      els2.buffering.hidden = true;
-      showHud();
-    }
+    els2.buffering.hidden = active || errorShown || !isBuffering();
+    if (active) showHud();
     renderPlayState();
   }
   function showStageError(message) {
