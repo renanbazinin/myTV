@@ -256,10 +256,9 @@ function initMediaSession() {
 function setTuning(active) {
     tuning = active;
     els.tuning.hidden = !active;
-    if (active) {
-        els.buffering.hidden = true;
-        showHud();
-    }
+    // The tuning screen covers the spinner; a cancelled zap brings it back
+    els.buffering.hidden = active || errorShown || !player.isBuffering();
+    if (active) showHud();
     renderPlayState();
 }
 
