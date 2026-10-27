@@ -768,8 +768,15 @@
   var buffering = false;
   var progressAt = 0;
   var progressPos = 0;
-  var lastTickAt = 0;
+  var stepClock = 0;
   var stallStep = 0;
+  var playedSinceStep = 0;
+  var playedTotal = 0;
+  var seekPending = false;
+  var playingAt = 0;
+  var waitingSince = 0;
+  var lastTickAt = 0;
+  var lastLoaded = {};
   var restartTimes = [];
   function initPlayer(videoElement, options) {
     video2 = videoElement;
@@ -786,12 +793,17 @@
       if (!current()) return;
       pausedAt = 0;
       if (onSessionPlaying) onSessionPlaying();
-      markProgress();
+      playingAt = performance.now();
+      waitingSince = 0;
       setBuffering(false);
     });
     video2.addEventListener("waiting", () => {
       if (!current() || !started) return;
+      if (!waitingSince) waitingSince = performance.now();
       setBuffering(true);
+    });
+    video2.addEventListener("seeking", () => {
+      seekPending = true;
     });
     video2.addEventListener("timeupdate", () => {
       if (current() && started && notePlayhead()) setBuffering(false);
@@ -811,6 +823,7 @@
     video2.addEventListener("pause", () => {
       if (!current()) return;
       wantPlaying = false;
+      waitingSince = 0;
       if (started && !pausedAt) pausedAt = Date.now();
       setBuffering(false);
       emit("player:state", { paused: true });
@@ -1025,6 +1038,9 @@
     pausedAt = 0;
     wantPlaying = false;
     stallStep = 0;
+    playedTotal = 0;
+    waitingSince = 0;
+    lastLoaded = {};
     restartTimes = [];
     setBuffering(false);
   }
@@ -1076,7 +1092,9 @@
   }
   var STALL_SPINNER_MS = 3e3;
   var STALL_RESUME_MS = 2e3;
-  var STALL_STEP_MS = [8e3, 18e3, 4e4];
+  var STALL_STEP_MS = [8e3, 1e4, 25e3];
+  var STALL_GIVE_UP_MS = 12e4;
+  var RECOVERED_AFTER_S = 10;
   var MAX_RESTARTS = 3;
   var RESTART_WINDOW_MS = 10 * 60 * 1e3;
   function setBuffering(active) {
@@ -1089,18 +1107,47 @@
   }
   function markProgress() {
     progressPos = video2.currentTime;
-    progressAt = Date.now();
+    progressAt = stepClock = performance.now();
     stallStep = 0;
+    playedSinceStep = 0;
+    seekPending = false;
   }
   function notePlayhead() {
+    if (video2.seeking) return false;
     const position = video2.currentTime;
+    if (seekPending) {
+      seekPending = false;
+      progressPos = position;
+      return false;
+    }
     const delta = position - progressPos;
-    if (video2.seeking || Math.abs(delta) < 0.1) return false;
+    if (Math.abs(delta) < 0.1) return false;
     progressPos = position;
     if (delta < 0 || delta > 5 || video2.paused || video2.readyState < 2) return false;
-    progressAt = Date.now();
-    stallStep = 0;
+    progressAt = stepClock = performance.now();
+    waitingSince = 0;
+    playedTotal += delta;
+    playedSinceStep += delta;
+    if (playedSinceStep >= RECOVERED_AFTER_S) stallStep = 0;
     return true;
+  }
+  function mediaArriving() {
+    let flights = null;
+    try {
+      flights = hlsVideo && hlsVideo.inFlightFragments;
+    } catch (_error) {
+    }
+    const position = video2.currentTime;
+    let arriving = false;
+    ["main", "audio"].forEach((type) => {
+      const flight = flights && flights[type];
+      const frag = flight && flight.state === "FRAG_LOADING" ? flight.frag : null;
+      const needed = !!frag && !!frag.stats && frag.start <= position + 1 && frag.start + frag.duration > position;
+      const mark = needed ? frag.sn + "/" + frag.level + "/" + frag.stats.loaded : "";
+      if (needed && frag.stats.loaded > 0 && mark !== lastLoaded[type]) arriving = true;
+      lastLoaded[type] = mark;
+    });
+    return arriving;
   }
   function bufferedAhead() {
     const ranges = video2.buffered;
@@ -1118,19 +1165,21 @@
   function startWatchdog() {
     clearInterval(watchdogTimer);
     markProgress();
-    lastTickAt = Date.now();
+    waitingSince = 0;
+    lastTickAt = performance.now();
     watchdogTimer = setInterval(checkStall, 1e3);
   }
   function checkStall() {
     if (!isActive() || !started) return;
-    const now = Date.now();
+    const now = performance.now();
     const late = now - lastTickAt > 3e3;
     lastTickAt = now;
     if (notePlayhead()) {
       setBuffering(false);
       return;
     }
-    if (!wantPlaying || document.hidden && !inPictureInPicture() || video2.webkitCurrentPlaybackTargetIsWireless || late) {
+    const unjudged = document.hidden && !inPictureInPicture() || video2.webkitCurrentPlaybackTargetIsWireless || late;
+    if (!wantPlaying || unjudged && !waitingSince) {
       markProgress();
       return;
     }
@@ -1139,24 +1188,48 @@
     if (video2.paused && stalled >= STALL_RESUME_MS && onSessionResume) {
       onSessionResume();
     }
-    if (stallStep < STALL_STEP_MS.length && stalled >= STALL_STEP_MS[stallStep]) {
+    if (!onSessionStall) return;
+    if (stalled >= STALL_GIVE_UP_MS) {
+      onSessionStall(STALL_STEP_MS.length);
+      return;
+    }
+    if (now - playingAt < 1500) return;
+    if (engine2 === "hlsjs" && mediaArriving()) {
+      stepClock = now;
+      return;
+    }
+    if (stallStep < STALL_STEP_MS.length && now - stepClock >= STALL_STEP_MS[stallStep]) {
       stallStep += 1;
-      if (onSessionStall) onSessionStall(stallStep);
+      stepClock = now;
+      playedSinceStep = 0;
+      onSessionStall(stallStep);
     }
   }
   function attachErrorRecovery(hls2, fail) {
     const Hls = window.Hls;
     let networkRetries = 0;
     let lastNetworkError = 0;
+    let playedAtNetworkError = 0;
     let mediaRetries = 0;
     let lastMediaError = 0;
+    const checkPlaylist = (_event, data) => {
+      const details = data && data.details;
+      if (hls2 === hlsVideo && details && details.live && !(details.targetduration > 0)) {
+        fail(new Error("This channel is not available right now."));
+      }
+    };
+    hls2.on(Hls.Events.LEVEL_LOADED, checkPlaylist);
+    hls2.on(Hls.Events.AUDIO_TRACK_LOADED, checkPlaylist);
     hls2.on(Hls.Events.ERROR, (_event, data) => {
       if (!data || !data.fatal || hls2 !== hlsVideo) return;
       const details = data.details || "unknown";
       if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-        const now = Date.now();
-        if (now - lastNetworkError > 6e4) networkRetries = 0;
+        const now = performance.now();
+        if (now - lastNetworkError > 6e4 || playedTotal - playedAtNetworkError >= 30) {
+          networkRetries = 0;
+        }
         lastNetworkError = now;
+        playedAtNetworkError = playedTotal;
         if (!started) {
           if (/manifest|level/i.test(details) || networkRetries >= 3) {
             fail(new Error("This channel is not available right now."));
@@ -1283,7 +1356,7 @@
             hlsVideo.startLoad();
           }
         } else if (hlsVideo) {
-          const now = Date.now();
+          const now = performance.now();
           restartTimes = restartTimes.filter((time) => now - time < RESTART_WINDOW_MS);
           if (restartTimes.length >= MAX_RESTARTS) {
             fail(new Error("Lost connection to the stream."));
@@ -1311,7 +1384,7 @@
           lastNativeReload = Date.now();
           console.warn(`[player] Native HLS ${reason}, reloading (${nativeRetries})`);
           video2.src = url;
-          safePlay(video2).catch(() => {
+          if (wantPlaying || !started) safePlay(video2).catch(() => {
           });
         };
         video2.src = url;
@@ -1431,7 +1504,7 @@
       } catch (_error) {
       }
     }
-    if (started) markProgress();
+    if (started && !waitingSince) markProgress();
     if (!video2.paused && isBehindLive()) {
       jumpToLive();
     }

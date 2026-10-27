@@ -42,7 +42,7 @@ let stoppedWhileHidden = false;
 let lastMemoryWarning = 0;
 let hlsPromise = null;
 
-// Stall watchdog (see "Stall watchdog" below)
+// Stall watchdog (see "Stall watchdog" below). Times are performance.now().
 let watchdogTimer = null;
 let onSessionStall = null;
 let onSessionResume = null;
@@ -50,10 +50,17 @@ let onSessionResume = null;
 // out). A media reset pauses the element without one.
 let wantPlaying = false;
 let buffering = false;
-let progressAt = 0;
+let progressAt = 0; // last time the playhead moved by playing
 let progressPos = 0;
-let lastTickAt = 0;
+let stepClock = 0; // the next recovery step counts from here
 let stallStep = 0;
+let playedSinceStep = 0;
+let playedTotal = 0;
+let seekPending = false;
+let playingAt = 0;
+let waitingSince = 0; // the element reported 'waiting' and hasn't played since
+let lastTickAt = 0;
+let lastLoaded = {};
 let restartTimes = [];
 
 /* ---------- Setup ---------- */
@@ -81,12 +88,19 @@ export function initPlayer(videoElement, options) {
         if (!current()) return;
         pausedAt = 0;
         if (onSessionPlaying) onSessionPlaying();
-        markProgress();
+        // Not progress by itself (it follows every seek and media reset), but
+        // playback gets a moment before the next recovery step
+        playingAt = performance.now();
+        waitingSince = 0;
         setBuffering(false);
     });
     video.addEventListener('waiting', () => {
         if (!current() || !started) return;
+        if (!waitingSince) waitingSince = performance.now();
         setBuffering(true);
+    });
+    video.addEventListener('seeking', () => {
+        seekPending = true;
     });
     // 'playing' doesn't always follow 'waiting' when playback picks up again
     // (seeks, media resets): the playhead moving ends the spinner too
@@ -107,6 +121,7 @@ export function initPlayer(videoElement, options) {
     video.addEventListener('pause', () => {
         if (!current()) return;
         wantPlaying = false;
+        waitingSince = 0;
         // System pauses too (lock screen, headphones out, a call): resuming
         // later should jump back to live
         if (started && !pausedAt) pausedAt = Date.now();
@@ -363,6 +378,9 @@ function teardownStream() {
     pausedAt = 0;
     wantPlaying = false;
     stallStep = 0;
+    playedTotal = 0;
+    waitingSince = 0;
+    lastLoaded = {};
     restartTimes = [];
     setBuffering(false);
 }
@@ -440,9 +458,13 @@ function startMemoryMonitor() {
 // playhead moves while it should and escalates instead of spinning forever.
 const STALL_SPINNER_MS = 3000; // spinner even without a 'waiting' event
 const STALL_RESUME_MS = 2000; // play again after a reset paused the element
-// Recovery steps: reload the stream's data, restart the stream, give up (the
-// error card offers Retry)
-const STALL_STEP_MS = [8000, 18000, 40000];
+// Recovery steps, each counted from the previous one: reload the stream's
+// data, restart the stream, give up (the error card offers Retry)
+const STALL_STEP_MS = [8000, 10000, 25000];
+// Give up even while a slow link still trickles data in
+const STALL_GIVE_UP_MS = 120000;
+// Playback that has to hold before the steps start over
+const RECOVERED_AFTER_S = 10;
 const MAX_RESTARTS = 3;
 const RESTART_WINDOW_MS = 10 * 60 * 1000;
 
@@ -460,28 +482,63 @@ export function isBuffering() {
 }
 
 /**
- * Restart the stall clock: first frame, playback resumed, back from the background
+ * Start the stall clock afresh: first frame, resumed from a pause, back from
+ * the background
  */
 function markProgress() {
     progressPos = video.currentTime;
-    progressAt = Date.now();
+    progressAt = stepClock = performance.now();
     stallStep = 0;
+    playedSinceStep = 0;
+    seekPending = false;
 }
 
 /**
- * Record playback progress. Seeks move the playhead too (live sync, nudges
- * over gaps) but aren't playback: follow them without counting them.
+ * Record playback progress. A seek (live sync, a nudge over a gap, Go live)
+ * moves the playhead too but isn't playback: follow it without counting it.
  * @returns {boolean} the playhead moved forward by playing
  */
 function notePlayhead() {
+    if (video.seeking) return false;
     const position = video.currentTime;
+    if (seekPending) {
+        seekPending = false;
+        progressPos = position;
+        return false;
+    }
     const delta = position - progressPos;
-    if (video.seeking || Math.abs(delta) < 0.1) return false;
+    if (Math.abs(delta) < 0.1) return false;
     progressPos = position;
     if (delta < 0 || delta > 5 || video.paused || video.readyState < 2) return false;
-    progressAt = Date.now();
-    stallStep = 0;
+    progressAt = stepClock = performance.now();
+    waitingSince = 0;
+    playedTotal += delta;
+    // A stall that comes back right after a recovery keeps escalating
+    playedSinceStep += delta;
+    if (playedSinceStep >= RECOVERED_AFTER_S) stallStep = 0;
     return true;
+}
+
+/**
+ * hls.js is downloading media the playhead waits for, and more of it arrived
+ * since the last tick: a slow link, not a stuck stream
+ */
+function mediaArriving() {
+    let flights = null;
+    try { flights = hlsVideo && hlsVideo.inFlightFragments; } catch (_error) { /* destroyed */ }
+    const position = video.currentTime;
+    let arriving = false;
+    ['main', 'audio'].forEach((type) => {
+        const flight = flights && flights[type];
+        const frag = flight && flight.state === 'FRAG_LOADING' ? flight.frag : null;
+        // Only what the playhead needs: video loading far ahead must not hold
+        // back recovery when the audio is what's missing
+        const needed = !!frag && !!frag.stats && frag.start <= position + 1 && frag.start + frag.duration > position;
+        const mark = needed ? frag.sn + '/' + frag.level + '/' + frag.stats.loaded : '';
+        if (needed && frag.stats.loaded > 0 && mark !== lastLoaded[type]) arriving = true;
+        lastLoaded[type] = mark;
+    });
+    return arriving;
 }
 
 /**
@@ -506,23 +563,26 @@ function inPictureInPicture() {
 function startWatchdog() {
     clearInterval(watchdogTimer);
     markProgress();
-    lastTickAt = Date.now();
+    waitingSince = 0;
+    lastTickAt = performance.now();
     watchdogTimer = setInterval(checkStall, 1000);
 }
 
 function checkStall() {
     if (!isActive() || !started) return;
-    const now = Date.now();
+    const now = performance.now();
     const late = now - lastTickAt > 3000;
     lastTickAt = now;
     if (notePlayhead()) {
         setBuffering(false);
         return;
     }
-    // Paused on purpose, or no way to judge: a background tab (throttled
-    // timers, video may be suspended), AirPlay, or a late tick
-    if (!wantPlaying || (document.hidden && !inPictureInPicture())
-        || video.webkitCurrentPlaybackTargetIsWireless || late) {
+    // Paused on purpose, or no way to judge (a background tab with throttled
+    // timers and maybe suspended video, AirPlay, a late tick) unless the
+    // element itself reported the stall
+    const unjudged = (document.hidden && !inPictureInPicture())
+        || video.webkitCurrentPlaybackTargetIsWireless || late;
+    if (!wantPlaying || (unjudged && !waitingSince)) {
         markProgress();
         return;
     }
@@ -531,9 +591,22 @@ function checkStall() {
     if (video.paused && stalled >= STALL_RESUME_MS && onSessionResume) {
         onSessionResume();
     }
-    if (stallStep < STALL_STEP_MS.length && stalled >= STALL_STEP_MS[stallStep]) {
+    if (!onSessionStall) return;
+    if (stalled >= STALL_GIVE_UP_MS) {
+        onSessionStall(STALL_STEP_MS.length);
+        return;
+    }
+    if (now - playingAt < 1500) return;
+    // A slow link still delivering: hls.js times that out itself
+    if (engine === 'hlsjs' && mediaArriving()) {
+        stepClock = now;
+        return;
+    }
+    if (stallStep < STALL_STEP_MS.length && now - stepClock >= STALL_STEP_MS[stallStep]) {
         stallStep += 1;
-        if (onSessionStall) onSessionStall(stallStep);
+        stepClock = now;
+        playedSinceStep = 0;
+        onSessionStall(stallStep);
     }
 }
 
@@ -546,20 +619,36 @@ function attachErrorRecovery(hls, fail) {
     const Hls = window.Hls;
     let networkRetries = 0;
     let lastNetworkError = 0;
+    let playedAtNetworkError = 0;
     let mediaRetries = 0;
     let lastMediaError = 0;
+
+    // Parsing errors are ignored (see getHlsConfig), so a live playlist
+    // without a target duration would be reloaded back to back
+    const checkPlaylist = (_event, data) => {
+        const details = data && data.details;
+        if (hls === hlsVideo && details && details.live && !(details.targetduration > 0)) {
+            fail(new Error('This channel is not available right now.'));
+        }
+    };
+    hls.on(Hls.Events.LEVEL_LOADED, checkPlaylist);
+    hls.on(Hls.Events.AUDIO_TRACK_LOADED, checkPlaylist);
 
     hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data || !data.fatal || hls !== hlsVideo) return;
         const details = data.details || 'unknown';
 
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            // The budget refills after a minute without network errors, not on
-            // loaded fragments: video can keep loading while the audio
-            // playlist fails, and the picture then waits for audio forever
-            const now = Date.now();
-            if (now - lastNetworkError > 60000) networkRetries = 0;
+            // The budget refills after a minute without network errors, or
+            // once the picture has played on for a while since the last one.
+            // Not on loaded fragments: video can keep loading while the audio
+            // playlist fails, and the picture then waits for audio forever.
+            const now = performance.now();
+            if (now - lastNetworkError > 60000 || playedTotal - playedAtNetworkError >= 30) {
+                networkRetries = 0;
+            }
             lastNetworkError = now;
+            playedAtNetworkError = playedTotal;
             if (!started) {
                 // hls.js already retried; a dead channel must fail fast, not spin forever
                 if (/manifest|level/i.test(details) || networkRetries >= 3) {
@@ -719,7 +808,7 @@ export function play(url) {
                     hlsVideo.startLoad();
                 }
             } else if (hlsVideo) {
-                const now = Date.now();
+                const now = performance.now();
                 restartTimes = restartTimes.filter((time) => now - time < RESTART_WINDOW_MS);
                 if (restartTimes.length >= MAX_RESTARTS) {
                     fail(new Error('Lost connection to the stream.'));
@@ -750,7 +839,8 @@ export function play(url) {
                 lastNativeReload = Date.now();
                 console.warn(`[player] Native HLS ${reason}, reloading (${nativeRetries})`);
                 video.src = url;
-                safePlay(video).catch(() => {});
+                // Paused by the user: the next Play loads it from the live edge
+                if (wantPlaying || !started) safePlay(video).catch(() => {});
             };
             video.src = url;
             useNativeTracks();
@@ -1162,8 +1252,9 @@ function onVisibilityChange() {
         stoppedWhileHidden = false;
         try { hlsVideo.startLoad(-1); } catch (_error) { /* no-op */ }
     }
-    // The stall watchdog doesn't judge background time
-    if (started) markProgress();
+    // The stall watchdog doesn't judge background time, unless the element
+    // reported the stall itself
+    if (started && !waitingSince) markProgress();
     if (!video.paused && isBehindLive()) {
         jumpToLive();
     }
